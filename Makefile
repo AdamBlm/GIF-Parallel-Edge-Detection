@@ -2,11 +2,16 @@ SRC_DIR=src
 HEADER_DIR=include
 OBJ_DIR=obj
 
-CC=gcc
+CC=mpicc
+NVCC = nvcc
+CFLAGS = -O3 -Wall -fopenmp -I$(HEADER_DIR)
+LDFLAGS = -lm -fopenmp
+NVCCFLAGS = -O3
+CUDA_LIBS = -lcudart
 
 # Add -fopenmp to both CFLAGS (for compilation) and LDFLAGS (for linking)
-CFLAGS = -O3 -I$(HEADER_DIR) -fopenmp
-LDFLAGS = -lm -fopenmp
+#CFLAGS = -O3 -I$(HEADER_DIR) -fopenmp
+#LDFLAGS = -lm -fopenmp
 
 SRC = dgif_lib.c \
       egif_lib.c \
