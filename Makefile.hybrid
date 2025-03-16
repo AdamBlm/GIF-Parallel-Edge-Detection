@@ -1,0 +1,29 @@
+CC = mpicc
+NVCC = nvcc
+CUDA_PATH = /Data/IPGen/env/lib/python3.13/site-packages/nvidia/cuda_runtime
+CFLAGS = -O3 -Iinclude -fopenmp
+NVCC_FLAGS = -I$(CUDA_PATH)/include -I./cuda_include -Xcompiler -fPIC --relocatable-device-code=true
+
+# Add include path for missing crt/host_config.h
+NVCC_FLAGS += -include $(CUDA_PATH)/include/host_config.h 
+
+LDFLAGS = -lm -lcudart -L$(CUDA_PATH)/lib64 -L$(CUDA_PATH)/lib -fopenmp
+
+OBJDIR = obj
+SRCDIR = src
+
+SOBEL_OBJ = $(OBJDIR)/dgif_lib.o $(OBJDIR)/egif_lib.o $(OBJDIR)/gif_err.o \
+	$(OBJDIR)/gif_font.o $(OBJDIR)/gif_hash.o $(OBJDIR)/gifalloc.o \
+	$(OBJDIR)/openbsd-reallocarray.o $(OBJDIR)/quantize.o
+
+sobelf_hybrid_3: $(OBJDIR)/sobelf_hybrid_3.o $(OBJDIR)/sobelf_hybrid_3_cuda.o $(SOBEL_OBJ)
+	$(CC) $(CFLAGS) -o $@ $^ $(LDFLAGS)
+
+$(OBJDIR)/sobelf_hybrid_3.o: sobelf_hybrid_3.c
+	$(CC) $(CFLAGS) -c -o $@ $<
+
+$(OBJDIR)/sobelf_hybrid_3_cuda.o: sobelf_hybrid_3.cu
+	$(NVCC) $(NVCC_FLAGS) -c -o $@ $<
+
+clean:
+	rm -f sobelf_hybrid_3 $(OBJDIR)/sobelf_hybrid_3.o $(OBJDIR)/sobelf_hybrid_3_cuda.o

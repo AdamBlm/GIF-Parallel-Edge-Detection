@@ -1,0 +1,19 @@
+CC = mpicc
+CFLAGS = -O3 -Iinclude -fopenmp
+LDFLAGS = -lm -fopenmp
+
+OBJDIR = obj
+SRCDIR = src
+
+SOBEL_OBJ = $(OBJDIR)/dgif_lib.o $(OBJDIR)/egif_lib.o $(OBJDIR)/gif_err.o \
+	$(OBJDIR)/gif_font.o $(OBJDIR)/gif_hash.o $(OBJDIR)/gifalloc.o \
+	$(OBJDIR)/openbsd-reallocarray.o $(OBJDIR)/quantize.o
+
+sobelf_omp_mpi: $(OBJDIR)/sobelf_omp_mpi.o $(SOBEL_OBJ)
+	$(CC) $(CFLAGS) -o $@ $^ $(LDFLAGS)
+
+$(OBJDIR)/sobelf_omp_mpi.o: $(SRCDIR)/sobelf_omp_mpi.c
+	$(CC) $(CFLAGS) -c -o $@ $<
+
+clean:
+	rm -f sobelf_omp_mpi $(OBJDIR)/sobelf_omp_mpi.o

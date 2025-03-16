@@ -1,12 +1,13 @@
 /*
  * INF560
  *
- * Image Filtering Project
+ * Image Filtering Project - OpenMP Implementation
  */
 #include <stdio.h>
 #include <stdlib.h>
 #include <math.h>
 #include <sys/time.h>
+#include <omp.h>
 
 #include "gif_lib.h"
 
@@ -573,353 +574,336 @@ store_pixels( char * filename, animated_gif * image )
     return 1 ;
 }
 
-void
-apply_gray_filter( animated_gif * image )
-{
-    int i, j ;
-    pixel ** p ;
-
-    p = image->p ;
-
-    for ( i = 0 ; i < image->n_images ; i++ )
-    {
-        for ( j = 0 ; j < image->width[i] * image->height[i] ; j++ )
-        {
-            int moy ;
-
-            moy = (p[i][j].r + p[i][j].g + p[i][j].b)/3 ;
-            if ( moy < 0 ) moy = 0 ;
-            if ( moy > 255 ) moy = 255 ;
-
-            p[i][j].r = moy ;
-            p[i][j].g = moy ;
-            p[i][j].b = moy ;
-        }
-    }
-}
-
 #define CONV(l,c,nb_c) \
     (l)*(nb_c)+(c)
 
-void apply_gray_line( animated_gif * image ) 
+/* Apply grayscale filter to the image */
+void apply_gray_filter( animated_gif * image )
 {
-    int i, j, k ;
-    pixel ** p ;
+    int i;
+    pixel ** p;
+    p = image->p;
 
-    p = image->p ;
-
+    #pragma omp parallel for default(none) shared(image, p)
     for ( i = 0 ; i < image->n_images ; i++ )
     {
-        for ( j = 0 ; j < 10 ; j++ )
+        int j;
+        int width = image->width[i];
+        int height = image->height[i];
+
+        #pragma omp parallel for default(none) shared(p, i, width, height)
+        for ( j = 0 ; j < width * height ; j++ )
         {
-            for ( k = image->width[i]/2 ; k < image->width[i] ; k++ )
-            {
-            p[i][CONV(j,k,image->width[i])].r = 0 ;
-            p[i][CONV(j,k,image->width[i])].g = 0 ;
-            p[i][CONV(j,k,image->width[i])].b = 0 ;
-            }
+            int moy;
+            moy = (p[i][j].r + p[i][j].g + p[i][j].b)/3;
+            if ( moy < 0 ) moy = 0;
+            if ( moy > 255 ) moy = 255;
+
+            p[i][j].r = moy;
+            p[i][j].g = moy;
+            p[i][j].b = moy;
         }
     }
 }
 
-void
-apply_blur_filter( animated_gif * image, int size, int threshold )
+/* Apply blur filter with domain decomposition */
+void apply_blur_filter(animated_gif * image, int size, int threshold)
 {
-    int i, j, k ;
-    int width, height ;
-    int end = 0 ;
-    int n_iter = 0 ;
+    int i;
+    pixel ** p;
+    p = image->p;
 
-    pixel ** p ;
-    pixel * new ;
-
-    /* Get the pixels of all images */
-    p = image->p ;
-
-    /* Process all images */
-    for ( i = 0 ; i < image->n_images ; i++ )
+    #pragma omp parallel for default(none) shared(image, p, size, threshold)
+    for (i = 0; i < image->n_images; i++)
     {
-        n_iter = 0 ;
-        width = image->width[i] ;
-        height = image->height[i] ;
-
+        int width = image->width[i];
+        int height = image->height[i];
+        int end = 0;
+        int n_iter = 0;
+        
         /* Allocate array of new pixels */
-        new = (pixel *)malloc(width * height * sizeof( pixel ) ) ;
-
+        pixel *new = (pixel *)malloc(width * height * sizeof(pixel));
+        if (new == NULL) {
+            fprintf(stderr, "Unable to allocate memory for new pixels in blur filter\n");
+            continue;  // Skip this image
+        }
 
         /* Perform at least one blur iteration */
         do
         {
-            end = 1 ;
-            n_iter++ ;
+            end = 1;
+            n_iter++;
 
-
-	for(j=0; j<height-1; j++)
-	{
-		for(k=0; k<width-1; k++)
-		{
-			new[CONV(j,k,width)].r = p[i][CONV(j,k,width)].r ;
-			new[CONV(j,k,width)].g = p[i][CONV(j,k,width)].g ;
-			new[CONV(j,k,width)].b = p[i][CONV(j,k,width)].b ;
-		}
-	}
-
-            /* Define a macro for MAX and MIN since they're not standard */
-            #ifndef MAX
-            #define MAX(a,b) ((a) > (b) ? (a) : (b))
-            #endif
-            #ifndef MIN
-            #define MIN(a,b) ((a) < (b) ? (a) : (b))
-            #endif
-
-            /* Apply blur on top part of image (10%) */
-            // for(j=size; j<MAX(height/10-size, size+1); j++)
-            // {
-            //     for(k=size; k<width-size; k++)
-            //     {
-            //         int stencil_j, stencil_k ;
-            //         int t_r = 0 ;
-            //         int t_g = 0 ;
-            //         int t_b = 0 ;
-
-            //         for ( stencil_j = -size ; stencil_j <= size ; stencil_j++ )
-            //         {
-            //             for ( stencil_k = -size ; stencil_k <= size ; stencil_k++ )
-            //             {
-            //                 t_r += p[i][CONV(j+stencil_j,k+stencil_k,width)].r ;
-            //                 t_g += p[i][CONV(j+stencil_j,k+stencil_k,width)].g ;
-            //                 t_b += p[i][CONV(j+stencil_j,k+stencil_k,width)].b ;
-            //             }
-            //         }
-
-            //         new[CONV(j,k,width)].r = t_r / ( (2*size+1)*(2*size+1) ) ;
-            //         new[CONV(j,k,width)].g = t_g / ( (2*size+1)*(2*size+1) ) ;
-            //         new[CONV(j,k,width)].b = t_b / ( (2*size+1)*(2*size+1) ) ;
-            //     }
-            // }
-
-            /* Copy the middle part of the image */
-            for(j=size; j<height; j++)
-            {
-                for(k=size; k<width; k++)
-                {
-                    new[CONV(j,k,width)].r = p[i][CONV(j,k,width)].r ; 
-                    new[CONV(j,k,width)].g = p[i][CONV(j,k,width)].g ; 
-                    new[CONV(j,k,width)].b = p[i][CONV(j,k,width)].b ; 
+            // Initialize new pixels with original values
+            for(int j = 0; j < height; j++) {
+                for(int k = 0; k < width; k++) {
+                    new[CONV(j, k, width)].r = p[i][CONV(j, k, width)].r;
+                    new[CONV(j, k, width)].g = p[i][CONV(j, k, width)].g;
+                    new[CONV(j, k, width)].b = p[i][CONV(j, k, width)].b;
                 }
             }
 
-            // /* Apply blur on the bottom part of the image (10%) */
-            // for(j=MIN(height*0.9+size, height-size-1); j<height-size; j++)
-            // {
-            //     for(k=size; k<width-size; k++)
-            //     {
-            //         int stencil_j, stencil_k ;
-            //         int t_r = 0 ;
-            //         int t_g = 0 ;
-            //         int t_b = 0 ;
-
-            //         for ( stencil_j = -size ; stencil_j <= size ; stencil_j++ )
-            //         {
-            //             for ( stencil_k = -size ; stencil_k <= size ; stencil_k++ )
-            //             {
-            //                 t_r += p[i][CONV(j+stencil_j,k+stencil_k,width)].r ;
-            //                 t_g += p[i][CONV(j+stencil_j,k+stencil_k,width)].g ;
-            //                 t_b += p[i][CONV(j+stencil_j,k+stencil_k,width)].b ;
-            //             }
-            //         }
-
-            //         new[CONV(j,k,width)].r = t_r / ( (2*size+1)*(2*size+1) ) ;
-            //         new[CONV(j,k,width)].g = t_g / ( (2*size+1)*(2*size+1) ) ;
-            //         new[CONV(j,k,width)].b = t_b / ( (2*size+1)*(2*size+1) ) ;
-            //     }
-            // }
-
-            for(j=1; j<height-1; j++)
+            // Apply blur on top part of image (10%)
+            #pragma omp parallel for default(none) shared(new, p, i, width, height, size) schedule(dynamic)
+            for(int j = size; j < height/10 - size; j++)
             {
-                for(k=1; k<width-1; k++)
+                for(int k = size; k < width - size; k++)
                 {
+                    int stencil_j, stencil_k;
+                    int t_r = 0;
+                    int t_g = 0;
+                    int t_b = 0;
 
-                    float diff_r ;
-                    float diff_g ;
-                    float diff_b ;
-
-                    diff_r = (new[CONV(j  ,k  ,width)].r - p[i][CONV(j  ,k  ,width)].r) ;
-                    diff_g = (new[CONV(j  ,k  ,width)].g - p[i][CONV(j  ,k  ,width)].g) ;
-                    diff_b = (new[CONV(j  ,k  ,width)].b - p[i][CONV(j  ,k  ,width)].b) ;
-
-                    if ( diff_r > threshold || -diff_r > threshold 
-                            ||
-                             diff_g > threshold || -diff_g > threshold
-                             ||
-                              diff_b > threshold || -diff_b > threshold
-                       ) {
-                        end = 0 ;
+                    for(stencil_j = -size; stencil_j <= size; stencil_j++)
+                    {
+                        for(stencil_k = -size; stencil_k <= size; stencil_k++)
+                        {
+                            t_r += p[i][CONV(j+stencil_j, k+stencil_k, width)].r;
+                            t_g += p[i][CONV(j+stencil_j, k+stencil_k, width)].g;
+                            t_b += p[i][CONV(j+stencil_j, k+stencil_k, width)].b;
+                        }
                     }
 
-                    p[i][CONV(j  ,k  ,width)].r = new[CONV(j  ,k  ,width)].r ;
-                    p[i][CONV(j  ,k  ,width)].g = new[CONV(j  ,k  ,width)].g ;
-                    p[i][CONV(j  ,k  ,width)].b = new[CONV(j  ,k  ,width)].b ;
+                    new[CONV(j, k, width)].r = t_r / ((2*size+1)*(2*size+1));
+                    new[CONV(j, k, width)].g = t_g / ((2*size+1)*(2*size+1));
+                    new[CONV(j, k, width)].b = t_b / ((2*size+1)*(2*size+1));
                 }
             }
 
+            // Copy the middle part of the image
+            #pragma omp parallel for default(none) shared(new, p, i, width, height, size) schedule(dynamic)
+            for(int j = height/10 - size; j < height*0.9 + size; j++)
+            {
+                for(int k = size; k < width - size; k++)
+                {
+                    new[CONV(j, k, width)].r = p[i][CONV(j, k, width)].r;
+                    new[CONV(j, k, width)].g = p[i][CONV(j, k, width)].g;
+                    new[CONV(j, k, width)].b = p[i][CONV(j, k, width)].b;
+                }
+            }
+
+            // Apply blur on the bottom part of the image (10%)
+            #pragma omp parallel for default(none) shared(new, p, i, width, height, size) schedule(dynamic)
+            for(int j = height*0.9 + size; j < height - size; j++)
+            {
+                for(int k = size; k < width - size; k++)
+                {
+                    int stencil_j, stencil_k;
+                    int t_r = 0;
+                    int t_g = 0;
+                    int t_b = 0;
+
+                    for(stencil_j = -size; stencil_j <= size; stencil_j++)
+                    {
+                        for(stencil_k = -size; stencil_k <= size; stencil_k++)
+                        {
+                            t_r += p[i][CONV(j+stencil_j, k+stencil_k, width)].r;
+                            t_g += p[i][CONV(j+stencil_j, k+stencil_k, width)].g;
+                            t_b += p[i][CONV(j+stencil_j, k+stencil_k, width)].b;
+                        }
+                    }
+
+                    new[CONV(j, k, width)].r = t_r / ((2*size+1)*(2*size+1));
+                    new[CONV(j, k, width)].g = t_g / ((2*size+1)*(2*size+1));
+                    new[CONV(j, k, width)].b = t_b / ((2*size+1)*(2*size+1));
+                }
+            }
+
+            // Check convergence and update pixels
+            #pragma omp parallel for default(none) shared(p, new, i, width, height, threshold, end) reduction(&&:end)
+            for(int j = 1; j < height - 1; j++)
+            {
+                for(int k = 1; k < width - 1; k++)
+                {
+                    float diff_r, diff_g, diff_b;
+
+                    diff_r = (new[CONV(j, k, width)].r - p[i][CONV(j, k, width)].r);
+                    diff_g = (new[CONV(j, k, width)].g - p[i][CONV(j, k, width)].g);
+                    diff_b = (new[CONV(j, k, width)].b - p[i][CONV(j, k, width)].b);
+
+                    if(diff_r > threshold || -diff_r > threshold ||
+                       diff_g > threshold || -diff_g > threshold ||
+                       diff_b > threshold || -diff_b > threshold)
+                    {
+                        end = 0;
+                    }
+
+                    p[i][CONV(j, k, width)].r = new[CONV(j, k, width)].r;
+                    p[i][CONV(j, k, width)].g = new[CONV(j, k, width)].g;
+                    p[i][CONV(j, k, width)].b = new[CONV(j, k, width)].b;
+                }
+            }
         }
-        while ( threshold > 0 && !end ) ;
+        while(threshold > 0 && !end);
 
 #if SOBELF_DEBUG
-	printf( "BLUR: number of iterations for image %d\n", n_iter ) ;
+        printf("BLUR: number of iterations for image %d: %d\n", i, n_iter);
 #endif
 
-        free (new) ;
+        free(new);
     }
-
 }
 
-void
-apply_sobel_filter( animated_gif * image )
+/* Apply Sobel filter with domain decomposition */
+void apply_sobel_filter(animated_gif * image)
 {
-    int i, j, k ;
-    int width, height ;
+    int i;
+    pixel ** p;
+    p = image->p;
 
-    pixel ** p ;
-
-    p = image->p ;
-
-    for ( i = 0 ; i < image->n_images ; i++ )
+    #pragma omp parallel for default(none) shared(image, p)
+    for(i = 0; i < image->n_images; i++)
     {
-        width = image->width[i] ;
-        height = image->height[i] ;
+        int width = image->width[i];
+        int height = image->height[i];
+        
+        // Allocate memory for the result
+        pixel *sobel = (pixel *)malloc(width * height * sizeof(pixel));
+        if (sobel == NULL) {
+            fprintf(stderr, "Unable to allocate memory for sobel filter\n");
+            continue;  // Skip this image
+        }
 
-        pixel * sobel ;
+        // Determine optimal chunk size for domain decomposition
+        int num_threads = omp_get_max_threads();
+        int chunk_height = (height - 2) / num_threads;
+        if (chunk_height < 1) chunk_height = 1;
 
-        sobel = (pixel *)malloc(width * height * sizeof( pixel ) ) ;
-
-        for(j=1; j<height-1; j++)
+        // Process image in chunks with proper overlapping
+        #pragma omp parallel for default(none) shared(sobel, p, i, width, height) schedule(dynamic, chunk_height)
+        for(int j = 1; j < height - 1; j++)
         {
-            for(k=1; k<width-1; k++)
+            for(int k = 1; k < width - 1; k++)
             {
                 int pixel_blue_no, pixel_blue_n, pixel_blue_ne;
                 int pixel_blue_so, pixel_blue_s, pixel_blue_se;
-                int pixel_blue_o , pixel_blue  , pixel_blue_e ;
+                int pixel_blue_o, pixel_blue, pixel_blue_e;
 
-                float deltaX_blue ;
-                float deltaY_blue ;
+                float deltaX_blue;
+                float deltaY_blue;
                 float val_blue;
 
-                pixel_blue_no = p[i][CONV(j-1,k-1,width)].b ;
-                pixel_blue_n  = p[i][CONV(j-1,k  ,width)].b ;
-                pixel_blue_ne = p[i][CONV(j-1,k+1,width)].b ;
-                pixel_blue_so = p[i][CONV(j+1,k-1,width)].b ;
-                pixel_blue_s  = p[i][CONV(j+1,k  ,width)].b ;
-                pixel_blue_se = p[i][CONV(j+1,k+1,width)].b ;
-                pixel_blue_o  = p[i][CONV(j  ,k-1,width)].b ;
-                pixel_blue    = p[i][CONV(j  ,k  ,width)].b ;
-                pixel_blue_e  = p[i][CONV(j  ,k+1,width)].b ;
+                // Get the 3x3 neighborhood
+                pixel_blue_no = p[i][CONV(j-1, k-1, width)].b;
+                pixel_blue_n  = p[i][CONV(j-1, k  , width)].b;
+                pixel_blue_ne = p[i][CONV(j-1, k+1, width)].b;
+                pixel_blue_so = p[i][CONV(j+1, k-1, width)].b;
+                pixel_blue_s  = p[i][CONV(j+1, k  , width)].b;
+                pixel_blue_se = p[i][CONV(j+1, k+1, width)].b;
+                pixel_blue_o  = p[i][CONV(j  , k-1, width)].b;
+                pixel_blue    = p[i][CONV(j  , k  , width)].b;
+                pixel_blue_e  = p[i][CONV(j  , k+1, width)].b;
 
-                deltaX_blue = -pixel_blue_no + pixel_blue_ne - 2*pixel_blue_o + 2*pixel_blue_e - pixel_blue_so + pixel_blue_se;             
-
+                // Calculate Sobel gradients
+                deltaX_blue = -pixel_blue_no + pixel_blue_ne - 2*pixel_blue_o + 2*pixel_blue_e - pixel_blue_so + pixel_blue_se;
                 deltaY_blue = pixel_blue_se + 2*pixel_blue_s + pixel_blue_so - pixel_blue_ne - 2*pixel_blue_n - pixel_blue_no;
-
                 val_blue = sqrt(deltaX_blue * deltaX_blue + deltaY_blue * deltaY_blue)/4;
 
-
-                if ( val_blue > 50 ) 
+                // Threshold to create binary edge image
+                if(val_blue > 50)
                 {
-                    sobel[CONV(j  ,k  ,width)].r = 255 ;
-                    sobel[CONV(j  ,k  ,width)].g = 255 ;
-                    sobel[CONV(j  ,k  ,width)].b = 255 ;
-                } else
+                    sobel[CONV(j, k, width)].r = 255;
+                    sobel[CONV(j, k, width)].g = 255;
+                    sobel[CONV(j, k, width)].b = 255;
+                }
+                else
                 {
-                    sobel[CONV(j  ,k  ,width)].r = 0 ;
-                    sobel[CONV(j  ,k  ,width)].g = 0 ;
-                    sobel[CONV(j  ,k  ,width)].b = 0 ;
+                    sobel[CONV(j, k, width)].r = 0;
+                    sobel[CONV(j, k, width)].g = 0;
+                    sobel[CONV(j, k, width)].b = 0;
                 }
             }
         }
 
-        for(j=1; j<height-1; j++)
+        // Copy the result back to the original image
+        #pragma omp parallel for default(none) shared(p, sobel, i, width, height)
+        for(int j = 1; j < height - 1; j++)
         {
-            for(k=1; k<width-1; k++)
+            for(int k = 1; k < width - 1; k++)
             {
-                p[i][CONV(j  ,k  ,width)].r = sobel[CONV(j  ,k  ,width)].r ;
-                p[i][CONV(j  ,k  ,width)].g = sobel[CONV(j  ,k  ,width)].g ;
-                p[i][CONV(j  ,k  ,width)].b = sobel[CONV(j  ,k  ,width)].b ;
+                p[i][CONV(j, k, width)].r = sobel[CONV(j, k, width)].r;
+                p[i][CONV(j, k, width)].g = sobel[CONV(j, k, width)].g;
+                p[i][CONV(j, k, width)].b = sobel[CONV(j, k, width)].b;
             }
         }
 
-        free (sobel) ;
+        free(sobel);
     }
-
 }
 
 /*
  * Main entry point
  */
-int 
-main( int argc, char ** argv )
+int main(int argc, char **argv)
 {
-    char * input_filename ; 
-    char * output_filename ;
-    animated_gif * image ;
+    char *input_filename;
+    char *output_filename;
+    animated_gif *image;
     struct timeval t1, t2;
-    double duration ;
+    double duration;
 
     /* Check command-line arguments */
-    if ( argc < 3 )
+    if(argc < 3)
     {
-        fprintf( stderr, "Usage: %s input.gif output.gif \n", argv[0] ) ;
-        return 1 ;
+        fprintf(stderr, "Usage: %s input.gif output.gif [num_threads]\n", argv[0]);
+        return 1;
     }
 
-    input_filename = argv[1] ;
-    output_filename = argv[2] ;
+    input_filename = argv[1];
+    output_filename = argv[2];
+    
+    /* Set number of threads if provided */
+    if(argc > 3)
+    {
+        int num_threads = atoi(argv[3]);
+        if(num_threads > 0)
+        {
+            omp_set_num_threads(num_threads);
+        }
+    }
+
+    printf("Using %d OpenMP threads\n", omp_get_max_threads());
 
     /* IMPORT Timer start */
     gettimeofday(&t1, NULL);
 
     /* Load file and store the pixels in array */
-    image = load_pixels( input_filename ) ;
-    if ( image == NULL ) { return 1 ; }
+    image = load_pixels(input_filename);
+    if(image == NULL) { return 1; }
 
     /* IMPORT Timer stop */
     gettimeofday(&t2, NULL);
-
-    duration = (t2.tv_sec -t1.tv_sec)+((t2.tv_usec-t1.tv_usec)/1e6);
-
-    printf( "GIF loaded from file %s with %d image(s) in %lf s\n", 
-            input_filename, image->n_images, duration ) ;
+    duration = (t2.tv_sec - t1.tv_sec) + ((t2.tv_usec - t1.tv_usec) / 1e6);
+    printf("GIF loaded from file %s with %d image(s) in %lf s\n", 
+            input_filename, image->n_images, duration);
 
     /* FILTER Timer start */
     gettimeofday(&t1, NULL);
 
     /* Convert the pixels into grayscale */
-    apply_gray_filter( image ) ;
+    apply_gray_filter(image);
 
     /* Apply blur filter with convergence value */
-    apply_blur_filter( image, 5, 20 ) ;
+    apply_blur_filter(image, 5, 20);
 
     /* Apply sobel filter on pixels */
-    // apply_sobel_filter( image ) ;
+    apply_sobel_filter(image);
 
     /* FILTER Timer stop */
     gettimeofday(&t2, NULL);
-
-    duration = (t2.tv_sec -t1.tv_sec)+((t2.tv_usec-t1.tv_usec)/1e6);
-
-    printf( "SOBEL done in %lf s\n", duration ) ;
+    duration = (t2.tv_sec - t1.tv_sec) + ((t2.tv_usec - t1.tv_usec) / 1e6);
+    printf("SOBEL done in %lf s\n", duration);
 
     /* EXPORT Timer start */
     gettimeofday(&t1, NULL);
 
     /* Store file from array of pixels to GIF file */
-    if ( !store_pixels( output_filename, image ) ) { return 1 ; }
+    if(!store_pixels(output_filename, image)) { return 1; }
 
     /* EXPORT Timer stop */
     gettimeofday(&t2, NULL);
+    duration = (t2.tv_sec - t1.tv_sec) + ((t2.tv_usec - t1.tv_usec) / 1e6);
+    printf("Export done in %lf s in file %s\n", duration, output_filename);
 
-    duration = (t2.tv_sec -t1.tv_sec)+((t2.tv_usec-t1.tv_usec)/1e6);
-
-    printf( "Export done in %lf s in file %s\n", duration, output_filename ) ;
-
-    return 0 ;
-}
+    return 0;
+} 

@@ -19,6 +19,10 @@ MPI_LDFLAGS   = -lm -fopenmp
 CUDA_CFLAGS = -O3 -I$(HEADER_DIR) -diag-suppress=541
 CUDA_LDFLAGS = -lm
 
+# OpenMP flags
+OMP_CFLAGS = -O3 -I$(HEADER_DIR) -fopenmp
+OMP_LDFLAGS = -lm -fopenmp
+
 # Sequential version sources and objects
 SRC = dgif_lib.c \
       egif_lib.c \
@@ -104,6 +108,27 @@ CUDA_OBJ = $(OBJ_DIR)/dgif_lib.o \
            $(OBJ_DIR)/openbsd-reallocarray.o \
            $(OBJ_DIR)/quantize.o
 
+# OpenMP version sources and objects
+OMP_SRC = dgif_lib.c \
+          egif_lib.c \
+          gif_err.c \
+          gif_font.c \
+          gif_hash.c \
+          gifalloc.c \
+          sobelf_omp.c \
+          openbsd-reallocarray.c \
+          quantize.c
+
+OMP_OBJ = $(OBJ_DIR)/dgif_lib.o \
+          $(OBJ_DIR)/egif_lib.o \
+          $(OBJ_DIR)/gif_err.o \
+          $(OBJ_DIR)/gif_font.o \
+          $(OBJ_DIR)/gif_hash.o \
+          $(OBJ_DIR)/gifalloc.o \
+          $(OBJ_DIR)/sobelf_omp.o \
+          $(OBJ_DIR)/openbsd-reallocarray.o \
+          $(OBJ_DIR)/quantize.o
+
 # Default target: build the sequential version
 all: sobelf
 
@@ -118,6 +143,9 @@ sobelf_mpi_domain: $(MPI_DOMAIN_OBJ)
 
 sobelf_cuda: $(CUDA_OBJ)
 	$(NVCC) $(CUDA_CFLAGS) -o $@ $^ $(CUDA_LDFLAGS)
+
+sobelf_omp: $(OMP_OBJ)
+	$(CC) $(OMP_CFLAGS) -o $@ $^ $(OMP_LDFLAGS)
 
 # Create the object directory if needed
 $(OBJ_DIR):
@@ -134,9 +162,13 @@ $(OBJ_DIR)/sobelf_mpi.o: $(SRC_DIR)/sobelf_mpi.c | $(OBJ_DIR)
 $(OBJ_DIR)/sobelf_mpi_domain.o: $(SRC_DIR)/sobelf_mpi_domain.c | $(OBJ_DIR)
 	$(MPICC) $(MPI_CFLAGS) -c -o $@ $<
 
+# Specific rule for OpenMP source file
+$(OBJ_DIR)/sobelf_omp.o: $(SRC_DIR)/sobelf_omp.c | $(OBJ_DIR)
+	$(CC) $(OMP_CFLAGS) -c -o $@ $<
+
 # Rule for compiling CUDA source files (for sobelf_cuda.cu and others)
 $(OBJ_DIR)/%.o: $(SRC_DIR)/%.cu | $(OBJ_DIR)
 	$(NVCC) $(CUDA_CFLAGS) -c -o $@ $<
 
 clean:
-	rm -f sobelf sobelf_mpi sobelf_mpi_domain sobelf_cuda $(OBJ_DIR)/*.o
+	rm -f sobelf sobelf_mpi sobelf_mpi_domain sobelf_cuda sobelf_omp $(OBJ_DIR)/*.o

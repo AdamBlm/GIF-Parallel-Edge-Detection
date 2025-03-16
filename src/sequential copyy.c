@@ -636,6 +636,7 @@ apply_blur_filter( animated_gif * image, int size, int threshold )
     /* Get the pixels of all images */
     p = image->p ;
 
+
     /* Process all images */
     for ( i = 0 ; i < image->n_images ; i++ )
     {
@@ -664,44 +665,36 @@ apply_blur_filter( animated_gif * image, int size, int threshold )
 		}
 	}
 
-            /* Define a macro for MAX and MIN since they're not standard */
-            #ifndef MAX
-            #define MAX(a,b) ((a) > (b) ? (a) : (b))
-            #endif
-            #ifndef MIN
-            #define MIN(a,b) ((a) < (b) ? (a) : (b))
-            #endif
-
             /* Apply blur on top part of image (10%) */
-            // for(j=size; j<MAX(height/10-size, size+1); j++)
-            // {
-            //     for(k=size; k<width-size; k++)
-            //     {
-            //         int stencil_j, stencil_k ;
-            //         int t_r = 0 ;
-            //         int t_g = 0 ;
-            //         int t_b = 0 ;
+            for(j=size; j<height/10-size; j++)
+            {
+                for(k=size; k<width-size; k++)
+                {
+                    int stencil_j, stencil_k ;
+                    int t_r = 0 ;
+                    int t_g = 0 ;
+                    int t_b = 0 ;
 
-            //         for ( stencil_j = -size ; stencil_j <= size ; stencil_j++ )
-            //         {
-            //             for ( stencil_k = -size ; stencil_k <= size ; stencil_k++ )
-            //             {
-            //                 t_r += p[i][CONV(j+stencil_j,k+stencil_k,width)].r ;
-            //                 t_g += p[i][CONV(j+stencil_j,k+stencil_k,width)].g ;
-            //                 t_b += p[i][CONV(j+stencil_j,k+stencil_k,width)].b ;
-            //             }
-            //         }
+                    for ( stencil_j = -size ; stencil_j <= size ; stencil_j++ )
+                    {
+                        for ( stencil_k = -size ; stencil_k <= size ; stencil_k++ )
+                        {
+                            t_r += p[i][CONV(j+stencil_j,k+stencil_k,width)].r ;
+                            t_g += p[i][CONV(j+stencil_j,k+stencil_k,width)].g ;
+                            t_b += p[i][CONV(j+stencil_j,k+stencil_k,width)].b ;
+                        }
+                    }
 
-            //         new[CONV(j,k,width)].r = t_r / ( (2*size+1)*(2*size+1) ) ;
-            //         new[CONV(j,k,width)].g = t_g / ( (2*size+1)*(2*size+1) ) ;
-            //         new[CONV(j,k,width)].b = t_b / ( (2*size+1)*(2*size+1) ) ;
-            //     }
-            // }
+                    new[CONV(j,k,width)].r = t_r / ( (2*size+1)*(2*size+1) ) ;
+                    new[CONV(j,k,width)].g = t_g / ( (2*size+1)*(2*size+1) ) ;
+                    new[CONV(j,k,width)].b = t_b / ( (2*size+1)*(2*size+1) ) ;
+                }
+            }
 
             /* Copy the middle part of the image */
-            for(j=size; j<height; j++)
+            for(j=height/10-size; j<height*0.9+size; j++)
             {
-                for(k=size; k<width; k++)
+                for(k=size; k<width-size; k++)
                 {
                     new[CONV(j,k,width)].r = p[i][CONV(j,k,width)].r ; 
                     new[CONV(j,k,width)].g = p[i][CONV(j,k,width)].g ; 
@@ -709,31 +702,31 @@ apply_blur_filter( animated_gif * image, int size, int threshold )
                 }
             }
 
-            // /* Apply blur on the bottom part of the image (10%) */
-            // for(j=MIN(height*0.9+size, height-size-1); j<height-size; j++)
-            // {
-            //     for(k=size; k<width-size; k++)
-            //     {
-            //         int stencil_j, stencil_k ;
-            //         int t_r = 0 ;
-            //         int t_g = 0 ;
-            //         int t_b = 0 ;
+            /* Apply blur on the bottom part of the image (10%) */
+            for(j=height*0.9+size; j<height-size; j++)
+            {
+                for(k=size; k<width-size; k++)
+                {
+                    int stencil_j, stencil_k ;
+                    int t_r = 0 ;
+                    int t_g = 0 ;
+                    int t_b = 0 ;
 
-            //         for ( stencil_j = -size ; stencil_j <= size ; stencil_j++ )
-            //         {
-            //             for ( stencil_k = -size ; stencil_k <= size ; stencil_k++ )
-            //             {
-            //                 t_r += p[i][CONV(j+stencil_j,k+stencil_k,width)].r ;
-            //                 t_g += p[i][CONV(j+stencil_j,k+stencil_k,width)].g ;
-            //                 t_b += p[i][CONV(j+stencil_j,k+stencil_k,width)].b ;
-            //             }
-            //         }
+                    for ( stencil_j = -size ; stencil_j <= size ; stencil_j++ )
+                    {
+                        for ( stencil_k = -size ; stencil_k <= size ; stencil_k++ )
+                        {
+                            t_r += p[i][CONV(j+stencil_j,k+stencil_k,width)].r ;
+                            t_g += p[i][CONV(j+stencil_j,k+stencil_k,width)].g ;
+                            t_b += p[i][CONV(j+stencil_j,k+stencil_k,width)].b ;
+                        }
+                    }
 
-            //         new[CONV(j,k,width)].r = t_r / ( (2*size+1)*(2*size+1) ) ;
-            //         new[CONV(j,k,width)].g = t_g / ( (2*size+1)*(2*size+1) ) ;
-            //         new[CONV(j,k,width)].b = t_b / ( (2*size+1)*(2*size+1) ) ;
-            //     }
-            // }
+                    new[CONV(j,k,width)].r = t_r / ( (2*size+1)*(2*size+1) ) ;
+                    new[CONV(j,k,width)].g = t_g / ( (2*size+1)*(2*size+1) ) ;
+                    new[CONV(j,k,width)].b = t_b / ( (2*size+1)*(2*size+1) ) ;
+                }
+            }
 
             for(j=1; j<height-1; j++)
             {
@@ -899,7 +892,7 @@ main( int argc, char ** argv )
     apply_blur_filter( image, 5, 20 ) ;
 
     /* Apply sobel filter on pixels */
-    // apply_sobel_filter( image ) ;
+    apply_sobel_filter( image ) ;
 
     /* FILTER Timer stop */
     gettimeofday(&t2, NULL);
