@@ -577,6 +577,14 @@ store_pixels( char * filename, animated_gif * image )
 #define CONV(l,c,nb_c) \
     (l)*(nb_c)+(c)
 
+/* Tile size for memory-efficient stencil operations */
+#define TILE_SIZE 64
+
+/* Min function helper */
+static inline int min(int a, int b) {
+    return (a < b) ? a : b;
+}
+
 /* Apply grayscale filter to the image */
 void apply_gray_filter(animated_gif * image)
 {
@@ -584,16 +592,17 @@ void apply_gray_filter(animated_gif * image)
     p = image->p;
 
     // Process each image sequentially (will be parallelized with MPI later)
+    // #pragma omp parallel for default(none) shared(p, image) schedule(dynamic)
     for (int i = 0; i < image->n_images; i++)
     {
         int width = image->width[i];
         int height = image->height[i];
         
-        // Parallelize at the row level for better load balancing
+        // Parallelize at the row level with SIMD optimizations
         #pragma omp parallel for default(none) shared(p, i, width, height) schedule(static)
         for (int j = 0; j < height; j++)
         {
-            // Process each pixel in the row
+            #pragma omp simd
             for (int k = 0; k < width; k++)
             {
                 int index = CONV(j, k, width);
@@ -609,7 +618,7 @@ void apply_gray_filter(animated_gif * image)
     }
 }
 
-/* Apply blur filter with improved parallelization */
+/* Apply blur filter with tiling optimization for better cache utilization */
 void apply_blur_filter(animated_gif * image, int size, int threshold)
 {
     pixel ** p;
@@ -636,7 +645,8 @@ void apply_blur_filter(animated_gif * image, int size, int threshold)
         }
     }
 
-    // Process each image sequentially (will be parallelized with MPI later)
+    // Process each image in parallel
+    // #pragma omp parallel for default(none) shared(p, buffer, image, size, threshold) schedule(dynamic)
     for (int i = 0; i < image->n_images; i++)
     {
         int width = image->width[i];
@@ -644,9 +654,10 @@ void apply_blur_filter(animated_gif * image, int size, int threshold)
         int end = 0;
         int n_iter = 0;
         
-        // Initialize buffer with original pixel values
+        // Initialize buffer with original pixel values - use NUMA-aware initialization
         #pragma omp parallel for default(none) shared(p, buffer, i, width, height) schedule(static)
         for (int j = 0; j < height; j++) {
+            #pragma omp simd
             for (int k = 0; k < width; k++) {
                 int index = CONV(j, k, width);
                 buffer[i][index].r = p[i][index].r;
@@ -661,60 +672,61 @@ void apply_blur_filter(animated_gif * image, int size, int threshold)
             end = 1;
             n_iter++;
 
-            // Process all pixels except the border
+            // Process all pixels except the border with tiling for better cache utilization
             #pragma omp parallel for default(none) shared(p, buffer, i, width, height, size) schedule(static)
-            for (int j = size; j < height - size; j++)
+            for (int jj = size; jj < height - size; jj += TILE_SIZE)
             {
-                // Process each pixel in the row
-                for (int k = size; k < width - size; k++)
+                for (int kk = size; kk < width - size; kk += TILE_SIZE)
                 {
-                    int t_r = 0;
-                    int t_g = 0;
-                    int t_b = 0;
-                    
-                    // Use a more cache-friendly access pattern for stencil
-                    for (int stencil_j = -size; stencil_j <= size; stencil_j++)
+                    // Process a tile
+                    for (int j = jj; j < min(jj + TILE_SIZE, height - size); j++)
                     {
-                        for (int stencil_k = -size; stencil_k <= size; stencil_k++)
+                        for (int k = kk; k < min(kk + TILE_SIZE, width - size); k++)
                         {
-                            // Calculer correctement l'indice avec la macro CONV
-                            int idx = CONV(j+stencil_j, k+stencil_k, width);
-                            t_r += p[i][idx].r;
-                            t_g += p[i][idx].g;
-                            t_b += p[i][idx].b;
+                            int t_r = 0;
+                            int t_g = 0;
+                            int t_b = 0;
+                            
+                            // Cache-friendly stencil computation
+                            for (int stencil_j = -size; stencil_j <= size; stencil_j++)
+                            {
+                                for (int stencil_k = -size; stencil_k <= size; stencil_k++)
+                                {
+                                    int idx = CONV(j+stencil_j, k+stencil_k, width);
+                                    t_r += p[i][idx].r;
+                                    t_g += p[i][idx].g;
+                                    t_b += p[i][idx].b;
+                                }
+                            }
+
+                            // Calculate the average value for the pixel
+                            const int denom = (2*size+1)*(2*size+1);
+                            buffer[i][CONV(j, k, width)].r = t_r / denom;
+                            buffer[i][CONV(j, k, width)].g = t_g / denom;
+                            buffer[i][CONV(j, k, width)].b = t_b / denom;
                         }
                     }
-
-                    // Calculate the average value for the pixel
-                    const int denom = (2*size+1)*(2*size+1);
-                    buffer[i][CONV(j, k, width)].r = t_r / denom;
-                    buffer[i][CONV(j, k, width)].g = t_g / denom;
-                    buffer[i][CONV(j, k, width)].b = t_b / denom;
                 }
             }
 
             // Check convergence and update pixels
             int continue_flag = 0;
             
-            // Update pixels and check convergence
             #pragma omp parallel for default(none) shared(p, buffer, i, width, height, size, threshold) reduction(|:continue_flag) schedule(static)
             for (int j = size; j < height - size; j++)
             {
                 for (int k = size; k < width - size; k++)
                 {
-                    // Calculate difference between old and new pixels
                     int index = CONV(j, k, width);
                     int diff_r = buffer[i][index].r - p[i][index].r;
                     int diff_g = buffer[i][index].g - p[i][index].g;
                     int diff_b = buffer[i][index].b - p[i][index].b;
 
-                    // Check if we need to continue iterations
                     if (abs(diff_r) > threshold || abs(diff_g) > threshold || abs(diff_b) > threshold)
                     {
                         continue_flag = 1;
                     }
 
-                    // Update original pixels with new values
                     p[i][index].r = buffer[i][index].r;
                     p[i][index].g = buffer[i][index].g;
                     p[i][index].b = buffer[i][index].b;
@@ -737,7 +749,7 @@ void apply_blur_filter(animated_gif * image, int size, int threshold)
     free(buffer);
 }
 
-/* Apply Sobel filter with optimized implementation */
+/* Apply Sobel filter with optimized multi-channel implementation */
 void apply_sobel_filter(animated_gif * image)
 {
     pixel ** p;
@@ -764,11 +776,26 @@ void apply_sobel_filter(animated_gif * image)
         }
     }
 
-    // Process each image sequentially (will be parallelized with MPI later)
+    // Process each image in parallel
+    //#pragma omp parallel for default(none) shared(p, sobel_buffer, image) schedule(dynamic)
     for (int i = 0; i < image->n_images; i++)
     {
         int width = image->width[i];
         int height = image->height[i];
+        
+        // First, copy the original image to buffer to preserve it
+        #pragma omp parallel for default(none) shared(p, sobel_buffer, i, width, height) schedule(static)
+        for (int j = 0; j < height; j++)
+        {
+            #pragma omp simd
+            for (int k = 0; k < width; k++)
+            {
+                int index = CONV(j, k, width);
+                sobel_buffer[i][index].r = p[i][index].r;
+                sobel_buffer[i][index].g = p[i][index].g;
+                sobel_buffer[i][index].b = p[i][index].b;
+            }
+        }
         
         // Apply Sobel filter with improved memory access pattern
         #pragma omp parallel for default(none) shared(p, sobel_buffer, i, width, height) schedule(static)
@@ -779,9 +806,31 @@ void apply_sobel_filter(animated_gif * image)
             const int row_curr = CONV(j, 0, width);
             const int row_next = CONV(j+1, 0, width);
             
+            #pragma omp simd
             for (int k = 1; k < width - 1; k++)
             {
-                // Get pixel values from the 3x3 neighborhood with better locality
+                // Get pixel values from the 3x3 neighborhood for each channel
+                // Red channel
+                int pixel_red_no = p[i][row_prev + k-1].r;
+                int pixel_red_n  = p[i][row_prev + k].r;
+                int pixel_red_ne = p[i][row_prev + k+1].r;
+                int pixel_red_o  = p[i][row_curr + k-1].r;
+                int pixel_red_e  = p[i][row_curr + k+1].r;
+                int pixel_red_so = p[i][row_next + k-1].r;
+                int pixel_red_s  = p[i][row_next + k].r;
+                int pixel_red_se = p[i][row_next + k+1].r;
+                
+                // Green channel
+                int pixel_green_no = p[i][row_prev + k-1].g;
+                int pixel_green_n  = p[i][row_prev + k].g;
+                int pixel_green_ne = p[i][row_prev + k+1].g;
+                int pixel_green_o  = p[i][row_curr + k-1].g;
+                int pixel_green_e  = p[i][row_curr + k+1].g;
+                int pixel_green_so = p[i][row_next + k-1].g;
+                int pixel_green_s  = p[i][row_next + k].g;
+                int pixel_green_se = p[i][row_next + k+1].g;
+                
+                // Blue channel
                 int pixel_blue_no = p[i][row_prev + k-1].b;
                 int pixel_blue_n  = p[i][row_prev + k].b;
                 int pixel_blue_ne = p[i][row_prev + k+1].b;
@@ -791,13 +840,29 @@ void apply_sobel_filter(animated_gif * image)
                 int pixel_blue_s  = p[i][row_next + k].b;
                 int pixel_blue_se = p[i][row_next + k+1].b;
 
-                // Calculate Sobel gradients
+                // Calculate Sobel gradients for each channel
+                // Red channel
+                float deltaX_red = -pixel_red_no + pixel_red_ne - 2*pixel_red_o + 2*pixel_red_e - pixel_red_so + pixel_red_se;
+                float deltaY_red = pixel_red_se + 2*pixel_red_s + pixel_red_so - pixel_red_ne - 2*pixel_red_n - pixel_red_no;
+                float val_red = sqrt(deltaX_red * deltaX_red + deltaY_red * deltaY_red)/4;
+                
+                // Green channel
+                float deltaX_green = -pixel_green_no + pixel_green_ne - 2*pixel_green_o + 2*pixel_green_e - pixel_green_so + pixel_green_se;
+                float deltaY_green = pixel_green_se + 2*pixel_green_s + pixel_green_so - pixel_green_ne - 2*pixel_green_n - pixel_green_no;
+                float val_green = sqrt(deltaX_green * deltaX_green + deltaY_green * deltaY_green)/4;
+                
+                // Blue channel
                 float deltaX_blue = -pixel_blue_no + pixel_blue_ne - 2*pixel_blue_o + 2*pixel_blue_e - pixel_blue_so + pixel_blue_se;
                 float deltaY_blue = pixel_blue_se + 2*pixel_blue_s + pixel_blue_so - pixel_blue_ne - 2*pixel_blue_n - pixel_blue_no;
                 float val_blue = sqrt(deltaX_blue * deltaX_blue + deltaY_blue * deltaY_blue)/4;
 
-                // Apply threshold to create binary edge image
-                if (val_blue > 50)
+                // Calculate maximum gradient value across all channels for better edge detection
+                float max_val = val_red;
+                if (val_green > max_val) max_val = val_green;
+                if (val_blue > max_val) max_val = val_blue;
+
+                // Apply binary thresholding for edge detection
+                if (max_val > 15)  // Adjusted threshold to get visible edges
                 {
                     sobel_buffer[i][row_curr + k].r = 255;
                     sobel_buffer[i][row_curr + k].g = 255;
@@ -812,11 +877,12 @@ void apply_sobel_filter(animated_gif * image)
             }
         }
         
-        // Copy sobel results back to original image
+        // Copy enhanced image back to original image
         #pragma omp parallel for default(none) shared(p, sobel_buffer, i, width, height) schedule(static)
-        for (int j = 1; j < height - 1; j++)
+        for (int j = 0; j < height; j++)
         {
-            for (int k = 1; k < width - 1; k++)
+            #pragma omp simd
+            for (int k = 0; k < width; k++)
             {
                 int index = CONV(j, k, width);
                 p[i][index].r = sobel_buffer[i][index].r;
@@ -886,7 +952,7 @@ int main(int argc, char **argv)
     apply_gray_filter(image);
 
     /* Apply blur filter with convergence value */
-    apply_blur_filter(image, 5, 20);
+    apply_blur_filter(image, 3, 0);
 
     /* Apply sobel filter on pixels */
     apply_sobel_filter(image);

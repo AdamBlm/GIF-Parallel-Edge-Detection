@@ -66,12 +66,20 @@ echo "Cleaning previous builds..."
 make clean
 
 # Compile sequential version
-echo "Compiling sequential version..."
+echo "Compiling sequential version (using sequential.c)..."
 make sobelf
 
 # Compile OpenMP version
 echo "Compiling OpenMP version..."
 make sobelf_omp
+
+# Compare blur parameters to match MPI version
+echo "Updating blur parameters for sequential version to match MPI version..."
+sed -i.bak 's/apply_blur_filter( image, 5, 20 )/apply_blur_filter( image, 3, 0 )/' src/sequential.c
+
+# Recompile with updated parameters
+echo "Recompiling sequential version with updated parameters..."
+make sobelf
 
 # Compile OpenMP+MPI version
 echo "Compiling OpenMP+MPI version..."

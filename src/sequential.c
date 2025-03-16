@@ -573,283 +573,331 @@ store_pixels( char * filename, animated_gif * image )
     return 1 ;
 }
 
-void
-apply_gray_filter( animated_gif * image )
-{
-    int i, j ;
-    pixel ** p ;
-
-    p = image->p ;
-
-    for ( i = 0 ; i < image->n_images ; i++ )
-    {
-        for ( j = 0 ; j < image->width[i] * image->height[i] ; j++ )
-        {
-            int moy ;
-
-            moy = (p[i][j].r + p[i][j].g + p[i][j].b)/3 ;
-            if ( moy < 0 ) moy = 0 ;
-            if ( moy > 255 ) moy = 255 ;
-
-            p[i][j].r = moy ;
-            p[i][j].g = moy ;
-            p[i][j].b = moy ;
-        }
-    }
-}
-
 #define CONV(l,c,nb_c) \
     (l)*(nb_c)+(c)
 
-void apply_gray_line( animated_gif * image ) 
+void
+apply_gray_filter(animated_gif * image)
 {
-    int i, j, k ;
-    pixel ** p ;
+    int i, j, k;
+    pixel ** p;
 
-    p = image->p ;
+    p = image->p;
 
-    for ( i = 0 ; i < image->n_images ; i++ )
+    for (i = 0; i < image->n_images; i++)
     {
-        for ( j = 0 ; j < 10 ; j++ )
+        int width = image->width[i];
+        int height = image->height[i];
+        
+        for (j = 0; j < height; j++)
         {
-            for ( k = image->width[i]/2 ; k < image->width[i] ; k++ )
+            for (k = 0; k < width; k++)
             {
-            p[i][CONV(j,k,image->width[i])].r = 0 ;
-            p[i][CONV(j,k,image->width[i])].g = 0 ;
-            p[i][CONV(j,k,image->width[i])].b = 0 ;
+                int index = CONV(j, k, width);
+                int moy = (p[i][index].r + p[i][index].g + p[i][index].b)/3;
+                if (moy < 0) moy = 0;
+                if (moy > 255) moy = 255;
+
+                p[i][index].r = moy;
+                p[i][index].g = moy;
+                p[i][index].b = moy;
             }
         }
     }
 }
 
 void
-apply_blur_filter( animated_gif * image, int size, int threshold )
+apply_blur_filter(animated_gif * image, int size, int threshold)
 {
-    int i, j, k ;
-    int width, height ;
-    int end = 0 ;
-    int n_iter = 0 ;
+    int i, j, k;
+    int width, height;
+    int end;
+    int n_iter;
+    int stencil_j, stencil_k;
 
-    pixel ** p ;
-    pixel * new ;
+    pixel ** p;
+    pixel ** buffer;
 
     /* Get the pixels of all images */
-    p = image->p ;
+    p = image->p;
 
-    /* Process all images */
-    for ( i = 0 ; i < image->n_images ; i++ )
-    {
-        n_iter = 0 ;
-        width = image->width[i] ;
-        height = image->height[i] ;
-
-        /* Allocate array of new pixels */
-        new = (pixel *)malloc(width * height * sizeof( pixel ) ) ;
-
-
-        /* Perform at least one blur iteration */
-        do
-        {
-            end = 1 ;
-            n_iter++ ;
-
-
-	for(j=0; j<height-1; j++)
-	{
-		for(k=0; k<width-1; k++)
-		{
-			new[CONV(j,k,width)].r = p[i][CONV(j,k,width)].r ;
-			new[CONV(j,k,width)].g = p[i][CONV(j,k,width)].g ;
-			new[CONV(j,k,width)].b = p[i][CONV(j,k,width)].b ;
-		}
-	}
-
-            /* Define a macro for MAX and MIN since they're not standard */
-            #ifndef MAX
-            #define MAX(a,b) ((a) > (b) ? (a) : (b))
-            #endif
-            #ifndef MIN
-            #define MIN(a,b) ((a) < (b) ? (a) : (b))
-            #endif
-
-            /* Apply blur on top part of image (10%) */
-            // for(j=size; j<MAX(height/10-size, size+1); j++)
-            // {
-            //     for(k=size; k<width-size; k++)
-            //     {
-            //         int stencil_j, stencil_k ;
-            //         int t_r = 0 ;
-            //         int t_g = 0 ;
-            //         int t_b = 0 ;
-
-            //         for ( stencil_j = -size ; stencil_j <= size ; stencil_j++ )
-            //         {
-            //             for ( stencil_k = -size ; stencil_k <= size ; stencil_k++ )
-            //             {
-            //                 t_r += p[i][CONV(j+stencil_j,k+stencil_k,width)].r ;
-            //                 t_g += p[i][CONV(j+stencil_j,k+stencil_k,width)].g ;
-            //                 t_b += p[i][CONV(j+stencil_j,k+stencil_k,width)].b ;
-            //             }
-            //         }
-
-            //         new[CONV(j,k,width)].r = t_r / ( (2*size+1)*(2*size+1) ) ;
-            //         new[CONV(j,k,width)].g = t_g / ( (2*size+1)*(2*size+1) ) ;
-            //         new[CONV(j,k,width)].b = t_b / ( (2*size+1)*(2*size+1) ) ;
-            //     }
-            // }
-
-            /* Copy the middle part of the image */
-            for(j=size; j<height; j++)
-            {
-                for(k=size; k<width; k++)
-                {
-                    new[CONV(j,k,width)].r = p[i][CONV(j,k,width)].r ; 
-                    new[CONV(j,k,width)].g = p[i][CONV(j,k,width)].g ; 
-                    new[CONV(j,k,width)].b = p[i][CONV(j,k,width)].b ; 
-                }
+    /* Allocate buffers for all images */
+    buffer = (pixel **)malloc(image->n_images * sizeof(pixel *));
+    if (buffer == NULL) {
+        fprintf(stderr, "Unable to allocate memory for blur filter buffers\n");
+        return;
+    }
+    
+    for (i = 0; i < image->n_images; i++) {
+        buffer[i] = (pixel *)malloc(image->width[i] * image->height[i] * sizeof(pixel));
+        if (buffer[i] == NULL) {
+            fprintf(stderr, "Unable to allocate memory for blur filter buffer %d\n", i);
+            // Free previously allocated buffers
+            for (int j = 0; j < i; j++) {
+                free(buffer[j]);
             }
-
-            // /* Apply blur on the bottom part of the image (10%) */
-            // for(j=MIN(height*0.9+size, height-size-1); j<height-size; j++)
-            // {
-            //     for(k=size; k<width-size; k++)
-            //     {
-            //         int stencil_j, stencil_k ;
-            //         int t_r = 0 ;
-            //         int t_g = 0 ;
-            //         int t_b = 0 ;
-
-            //         for ( stencil_j = -size ; stencil_j <= size ; stencil_j++ )
-            //         {
-            //             for ( stencil_k = -size ; stencil_k <= size ; stencil_k++ )
-            //             {
-            //                 t_r += p[i][CONV(j+stencil_j,k+stencil_k,width)].r ;
-            //                 t_g += p[i][CONV(j+stencil_j,k+stencil_k,width)].g ;
-            //                 t_b += p[i][CONV(j+stencil_j,k+stencil_k,width)].b ;
-            //             }
-            //         }
-
-            //         new[CONV(j,k,width)].r = t_r / ( (2*size+1)*(2*size+1) ) ;
-            //         new[CONV(j,k,width)].g = t_g / ( (2*size+1)*(2*size+1) ) ;
-            //         new[CONV(j,k,width)].b = t_b / ( (2*size+1)*(2*size+1) ) ;
-            //     }
-            // }
-
-            for(j=1; j<height-1; j++)
-            {
-                for(k=1; k<width-1; k++)
-                {
-
-                    float diff_r ;
-                    float diff_g ;
-                    float diff_b ;
-
-                    diff_r = (new[CONV(j  ,k  ,width)].r - p[i][CONV(j  ,k  ,width)].r) ;
-                    diff_g = (new[CONV(j  ,k  ,width)].g - p[i][CONV(j  ,k  ,width)].g) ;
-                    diff_b = (new[CONV(j  ,k  ,width)].b - p[i][CONV(j  ,k  ,width)].b) ;
-
-                    if ( diff_r > threshold || -diff_r > threshold 
-                            ||
-                             diff_g > threshold || -diff_g > threshold
-                             ||
-                              diff_b > threshold || -diff_b > threshold
-                       ) {
-                        end = 0 ;
-                    }
-
-                    p[i][CONV(j  ,k  ,width)].r = new[CONV(j  ,k  ,width)].r ;
-                    p[i][CONV(j  ,k  ,width)].g = new[CONV(j  ,k  ,width)].g ;
-                    p[i][CONV(j  ,k  ,width)].b = new[CONV(j  ,k  ,width)].b ;
-                }
-            }
-
+            free(buffer);
+            return;
         }
-        while ( threshold > 0 && !end ) ;
-
-#if SOBELF_DEBUG
-	printf( "BLUR: number of iterations for image %d\n", n_iter ) ;
-#endif
-
-        free (new) ;
     }
 
+    /* Process all images */
+    for (i = 0; i < image->n_images; i++)
+    {
+        n_iter = 0;
+        width = image->width[i];
+        height = image->height[i];
+
+        // Initialize buffer with original pixel values
+        for (j = 0; j < height; j++) {
+            for (k = 0; k < width; k++) {
+                int index = CONV(j, k, width);
+                buffer[i][index].r = p[i][index].r;
+                buffer[i][index].g = p[i][index].g;
+                buffer[i][index].b = p[i][index].b;
+            }
+        }
+
+        /* Perform blur iterations until convergence */
+        do
+        {
+            end = 1;
+            n_iter++;
+
+            // Process all pixels except the border
+            for (j = size; j < height - size; j++)
+            {
+                for (k = size; k < width - size; k++)
+                {
+                    int t_r = 0;
+                    int t_g = 0;
+                    int t_b = 0;
+                    
+                    // Compute stencil
+                    for (stencil_j = -size; stencil_j <= size; stencil_j++)
+                    {
+                        for (stencil_k = -size; stencil_k <= size; stencil_k++)
+                        {
+                            int idx = CONV(j+stencil_j, k+stencil_k, width);
+                            t_r += p[i][idx].r;
+                            t_g += p[i][idx].g;
+                            t_b += p[i][idx].b;
+                        }
+                    }
+
+                    // Calculate the average value for the pixel
+                    const int denom = (2*size+1)*(2*size+1);
+                    buffer[i][CONV(j, k, width)].r = t_r / denom;
+                    buffer[i][CONV(j, k, width)].g = t_g / denom;
+                    buffer[i][CONV(j, k, width)].b = t_b / denom;
+                }
+            }
+
+            // Check convergence and update pixels
+            int continue_flag = 0;
+            
+            for (j = size; j < height - size; j++)
+            {
+                for (k = size; k < width - size; k++)
+                {
+                    int index = CONV(j, k, width);
+                    int diff_r = buffer[i][index].r - p[i][index].r;
+                    int diff_g = buffer[i][index].g - p[i][index].g;
+                    int diff_b = buffer[i][index].b - p[i][index].b;
+
+                    if (abs(diff_r) > threshold || abs(diff_g) > threshold || abs(diff_b) > threshold)
+                    {
+                        continue_flag = 1;
+                    }
+
+                    p[i][index].r = buffer[i][index].r;
+                    p[i][index].g = buffer[i][index].g;
+                    p[i][index].b = buffer[i][index].b;
+                }
+            }
+            
+            end = !continue_flag;
+        }
+        while (threshold > 0 && !end);
+
+#if SOBELF_DEBUG
+        printf("BLUR: number of iterations for image %d: %d\n", i, n_iter);
+#endif
+    }
+    
+    // Free the allocated buffers
+    for (i = 0; i < image->n_images; i++) {
+        free(buffer[i]);
+    }
+    free(buffer);
 }
 
 void
-apply_sobel_filter( animated_gif * image )
+apply_sobel_filter(animated_gif * image)
 {
-    int i, j, k ;
-    int width, height ;
+    int i, j, k;
+    int width, height;
+    
+    float deltaX_red, deltaY_red, val_red;
+    float deltaX_green, deltaY_green, val_green;
+    float deltaX_blue, deltaY_blue, val_blue;
+    float max_val;
 
-    pixel ** p ;
+    pixel ** p;
+    pixel ** sobel_buffer;
 
-    p = image->p ;
+    p = image->p;
 
-    for ( i = 0 ; i < image->n_images ; i++ )
+    // Allocate buffers for all images
+    sobel_buffer = (pixel **)malloc(image->n_images * sizeof(pixel *));
+    if (sobel_buffer == NULL) {
+        fprintf(stderr, "Unable to allocate memory for sobel filter buffers\n");
+        return;
+    }
+    
+    for (i = 0; i < image->n_images; i++) {
+        sobel_buffer[i] = (pixel *)malloc(image->width[i] * image->height[i] * sizeof(pixel));
+        if (sobel_buffer[i] == NULL) {
+            fprintf(stderr, "Unable to allocate memory for sobel filter buffer %d\n", i);
+            // Free previously allocated buffers
+            for (int j = 0; j < i; j++) {
+                free(sobel_buffer[j]);
+            }
+            free(sobel_buffer);
+            return;
+        }
+    }
+
+    // Process all images
+    for (i = 0; i < image->n_images; i++)
     {
-        width = image->width[i] ;
-        height = image->height[i] ;
-
-        pixel * sobel ;
-
-        sobel = (pixel *)malloc(width * height * sizeof( pixel ) ) ;
-
-        for(j=1; j<height-1; j++)
+        width = image->width[i];
+        height = image->height[i];
+        
+        // First, copy the original image to buffer to preserve it
+        for (j = 0; j < height; j++)
         {
-            for(k=1; k<width-1; k++)
+            for (k = 0; k < width; k++)
             {
-                int pixel_blue_no, pixel_blue_n, pixel_blue_ne;
-                int pixel_blue_so, pixel_blue_s, pixel_blue_se;
-                int pixel_blue_o , pixel_blue  , pixel_blue_e ;
+                int index = CONV(j, k, width);
+                sobel_buffer[i][index].r = p[i][index].r;
+                sobel_buffer[i][index].g = p[i][index].g;
+                sobel_buffer[i][index].b = p[i][index].b;
+            }
+        }
+        
+        // Apply Sobel filter
+        for (j = 1; j < height - 1; j++)
+        {
+            for (k = 1; k < width - 1; k++)
+            {
+                // Get pixel values from the 3x3 neighborhood for each channel
+                // Red channel
+                int pixel_red_no = p[i][CONV(j-1, k-1, width)].r;
+                int pixel_red_n  = p[i][CONV(j-1, k  , width)].r;
+                int pixel_red_ne = p[i][CONV(j-1, k+1, width)].r;
+                int pixel_red_o  = p[i][CONV(j  , k-1, width)].r;
+                int pixel_red_e  = p[i][CONV(j  , k+1, width)].r;
+                int pixel_red_so = p[i][CONV(j+1, k-1, width)].r;
+                int pixel_red_s  = p[i][CONV(j+1, k  , width)].r;
+                int pixel_red_se = p[i][CONV(j+1, k+1, width)].r;
+                
+                // Green channel
+                int pixel_green_no = p[i][CONV(j-1, k-1, width)].g;
+                int pixel_green_n  = p[i][CONV(j-1, k  , width)].g;
+                int pixel_green_ne = p[i][CONV(j-1, k+1, width)].g;
+                int pixel_green_o  = p[i][CONV(j  , k-1, width)].g;
+                int pixel_green_e  = p[i][CONV(j  , k+1, width)].g;
+                int pixel_green_so = p[i][CONV(j+1, k-1, width)].g;
+                int pixel_green_s  = p[i][CONV(j+1, k  , width)].g;
+                int pixel_green_se = p[i][CONV(j+1, k+1, width)].g;
+                
+                // Blue channel
+                int pixel_blue_no = p[i][CONV(j-1, k-1, width)].b;
+                int pixel_blue_n  = p[i][CONV(j-1, k  , width)].b;
+                int pixel_blue_ne = p[i][CONV(j-1, k+1, width)].b;
+                int pixel_blue_o  = p[i][CONV(j  , k-1, width)].b;
+                int pixel_blue_e  = p[i][CONV(j  , k+1, width)].b;
+                int pixel_blue_so = p[i][CONV(j+1, k-1, width)].b;
+                int pixel_blue_s  = p[i][CONV(j+1, k  , width)].b;
+                int pixel_blue_se = p[i][CONV(j+1, k+1, width)].b;
 
-                float deltaX_blue ;
-                float deltaY_blue ;
-                float val_blue;
-
-                pixel_blue_no = p[i][CONV(j-1,k-1,width)].b ;
-                pixel_blue_n  = p[i][CONV(j-1,k  ,width)].b ;
-                pixel_blue_ne = p[i][CONV(j-1,k+1,width)].b ;
-                pixel_blue_so = p[i][CONV(j+1,k-1,width)].b ;
-                pixel_blue_s  = p[i][CONV(j+1,k  ,width)].b ;
-                pixel_blue_se = p[i][CONV(j+1,k+1,width)].b ;
-                pixel_blue_o  = p[i][CONV(j  ,k-1,width)].b ;
-                pixel_blue    = p[i][CONV(j  ,k  ,width)].b ;
-                pixel_blue_e  = p[i][CONV(j  ,k+1,width)].b ;
-
-                deltaX_blue = -pixel_blue_no + pixel_blue_ne - 2*pixel_blue_o + 2*pixel_blue_e - pixel_blue_so + pixel_blue_se;             
-
+                // Calculate Sobel gradients for each channel
+                // Red channel
+                deltaX_red = -pixel_red_no + pixel_red_ne - 2*pixel_red_o + 2*pixel_red_e - pixel_red_so + pixel_red_se;
+                deltaY_red = pixel_red_se + 2*pixel_red_s + pixel_red_so - pixel_red_ne - 2*pixel_red_n - pixel_red_no;
+                val_red = sqrt(deltaX_red * deltaX_red + deltaY_red * deltaY_red)/4;
+                
+                // Green channel
+                deltaX_green = -pixel_green_no + pixel_green_ne - 2*pixel_green_o + 2*pixel_green_e - pixel_green_so + pixel_green_se;
+                deltaY_green = pixel_green_se + 2*pixel_green_s + pixel_green_so - pixel_green_ne - 2*pixel_green_n - pixel_green_no;
+                val_green = sqrt(deltaX_green * deltaX_green + deltaY_green * deltaY_green)/4;
+                
+                // Blue channel
+                deltaX_blue = -pixel_blue_no + pixel_blue_ne - 2*pixel_blue_o + 2*pixel_blue_e - pixel_blue_so + pixel_blue_se;
                 deltaY_blue = pixel_blue_se + 2*pixel_blue_s + pixel_blue_so - pixel_blue_ne - 2*pixel_blue_n - pixel_blue_no;
-
                 val_blue = sqrt(deltaX_blue * deltaX_blue + deltaY_blue * deltaY_blue)/4;
 
+                // Calculate maximum gradient value across all channels for better edge detection
+                max_val = val_red;
+                if (val_green > max_val) max_val = val_green;
+                if (val_blue > max_val) max_val = val_blue;
 
-                if ( val_blue > 50 ) 
+                // Apply binary thresholding for edge detection
+                if (max_val > 15)  // Adjusted threshold to get visible edges
                 {
-                    sobel[CONV(j  ,k  ,width)].r = 255 ;
-                    sobel[CONV(j  ,k  ,width)].g = 255 ;
-                    sobel[CONV(j  ,k  ,width)].b = 255 ;
-                } else
+                    sobel_buffer[i][CONV(j, k, width)].r = 255;
+                    sobel_buffer[i][CONV(j, k, width)].g = 255;
+                    sobel_buffer[i][CONV(j, k, width)].b = 255;
+                }
+                else
                 {
-                    sobel[CONV(j  ,k  ,width)].r = 0 ;
-                    sobel[CONV(j  ,k  ,width)].g = 0 ;
-                    sobel[CONV(j  ,k  ,width)].b = 0 ;
+                    sobel_buffer[i][CONV(j, k, width)].r = 0;
+                    sobel_buffer[i][CONV(j, k, width)].g = 0;
+                    sobel_buffer[i][CONV(j, k, width)].b = 0;
                 }
             }
         }
-
-        for(j=1; j<height-1; j++)
+        
+        // Copy enhanced image back to original image
+        for (j = 0; j < height; j++)
         {
-            for(k=1; k<width-1; k++)
+            for (k = 0; k < width; k++)
             {
-                p[i][CONV(j  ,k  ,width)].r = sobel[CONV(j  ,k  ,width)].r ;
-                p[i][CONV(j  ,k  ,width)].g = sobel[CONV(j  ,k  ,width)].g ;
-                p[i][CONV(j  ,k  ,width)].b = sobel[CONV(j  ,k  ,width)].b ;
+                int index = CONV(j, k, width);
+                p[i][index].r = sobel_buffer[i][index].r;
+                p[i][index].g = sobel_buffer[i][index].g;
+                p[i][index].b = sobel_buffer[i][index].b;
             }
         }
-
-        free (sobel) ;
     }
+    
+    // Free the allocated buffers
+    for (i = 0; i < image->n_images; i++) {
+        free(sobel_buffer[i]);
+    }
+    free(sobel_buffer);
+}
 
+void apply_gray_line(animated_gif * image) 
+{
+    int i, j, k;
+    pixel ** p;
+
+    p = image->p;
+
+    for (i = 0; i < image->n_images; i++)
+    {
+        for (j = 0; j < 10; j++)
+        {
+            for (k = image->width[i]/2; k < image->width[i]; k++)
+            {
+                p[i][CONV(j,k,image->width[i])].r = 0;
+                p[i][CONV(j,k,image->width[i])].g = 0;
+                p[i][CONV(j,k,image->width[i])].b = 0;
+            }
+        }
+    }
 }
 
 /*
@@ -896,10 +944,9 @@ main( int argc, char ** argv )
     apply_gray_filter( image ) ;
 
     /* Apply blur filter with convergence value */
-    apply_blur_filter( image, 5, 20 ) ;
-
+    apply_blur_filter( image, 3, 0 ) ;
     /* Apply sobel filter on pixels */
-    // apply_sobel_filter( image ) ;
+    apply_sobel_filter( image ) ;
 
     /* FILTER Timer stop */
     gettimeofday(&t2, NULL);
