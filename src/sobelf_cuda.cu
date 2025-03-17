@@ -17,7 +17,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <math.h>
-#include <sys/time.h>
+#include <sys/time.h> 
 #include "gif_lib.h"
 #include <cuda_runtime.h>
 
@@ -773,31 +773,39 @@ void process_tile(pixel *tile_in, pixel *tile_out, int tile_w, int tile_h) {
            tile_out[0].r, tile_out[0].g, tile_out[0].b);
 #endif
 }
-
-/* --------------------------------------------------------------------
-   main(): Process each image frame in tiles.
-   -------------------------------------------------------------------- */
 int main( int argc, char ** argv )
 {
-    if(argc < 3) {
-        fprintf(stderr, "Usage: %s input.gif output.gif\n", argv[0]);
-        return 1;
-    }
-    
-    char * input_filename = argv[1];
-    char * output_filename = argv[2];
-    
+    char * input_filename;
+    char * output_filename;
+    animated_gif * image;
     struct timeval t1, t2;
     double duration;
     
-    animated_gif * image = load_pixels( input_filename );
-    if(image == NULL) {
-        fprintf(stderr, "Error loading GIF\n");
+    if ( argc < 3 )
+    {
+        fprintf( stderr, "Usage: %s input.gif output.gif\n", argv[0] );
         return 1;
     }
-    printf("DEBUG: GIF loaded from file %s with %d image(s)\n", input_filename, image->n_images);
     
-    // Process each image (frame) in tiles.
+    input_filename = argv[1];
+    output_filename = argv[2];
+    
+    /* ---------------------- Load Time ---------------------- */
+    gettimeofday(&t1, NULL);
+    image = load_pixels( input_filename );
+    if ( image == NULL ) { return 1; }
+    gettimeofday(&t2, NULL);
+    duration = (t2.tv_sec - t1.tv_sec) + ((t2.tv_usec-t1.tv_usec)/1e6);
+    // Print load time: field 10 will be the duration (in seconds)
+    printf("GIF loaded from file %s with %d image(s) in %lf s\n", 
+           input_filename, image->n_images, duration);
+    
+    /* ---------------------- Filter Time ---------------------- */
+    gettimeofday(&t1, NULL);
+    
+    /* --- Apply filters on GPU --- */
+    // Grayscale, blur and Sobel are applied by process_tile() in your tiling loop.
+    // (The code below processes each image frame in tiles.)
     for (int img = 0; img < image->n_images; img++) {
         int w = image->width[img];
         int h = image->height[img];
@@ -831,7 +839,6 @@ int main( int argc, char ** argv )
                            currentTileWidth * sizeof(pixel));
                 }
                 
-               
                 process_tile(tile_in, tile_out, currentTileWidth, currentTileHeight);
                 
                 // Copy processed tile back into the temporary full-image buffer.
@@ -851,14 +858,21 @@ int main( int argc, char ** argv )
         free(temp);
     }
     
+    gettimeofday(&t2, NULL);
+    duration = (t2.tv_sec - t1.tv_sec) + ((t2.tv_usec-t1.tv_usec)/1e6);
+    // Print filter time: field 5 of this message will be the duration.
+    printf("GPU filters done in %lf s\n", duration);
+    
+    /* ---------------------- Export Time ---------------------- */
     gettimeofday(&t1, NULL);
     if(!store_pixels(output_filename, image)) {
         fprintf(stderr, "Error storing GIF\n");
         return 1;
     }
     gettimeofday(&t2, NULL);
-    duration = (t2.tv_sec - t1.tv_sec) + ((t2.tv_usec - t1.tv_usec) / 1e6);
-    printf("DEBUG: Export done in %lf s in file %s\n", duration, output_filename);
+    duration = (t2.tv_sec - t1.tv_sec) + ((t2.tv_usec-t1.tv_usec)/1e6);
+    // Print export time: field 4 of this message will be the duration.
+    printf("Export done in %lf s in file %s\n", duration, output_filename);
     
     return 0;
 }
