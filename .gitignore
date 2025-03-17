@@ -1,1 +1,17 @@
+# Ignore large files
 images/original/test_ivain_1.gif
+
+# Ignore build files
+*.o
+*.exe
+*.out
+*.so
+*.a
+
+# Ignore temporary files
+*.tmp
+*~
+.DS_Store
+
+# Log files
+*.log
