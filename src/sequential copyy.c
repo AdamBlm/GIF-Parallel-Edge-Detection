@@ -889,7 +889,7 @@ main( int argc, char ** argv )
     apply_gray_filter( image ) ;
 
     /* Apply blur filter with convergence value */
-     apply_blur_filter( image, 5, 20 ) ;  
+    apply_blur_filter( image, 5, 20 ) ;
 
     /* Apply sobel filter on pixels */
     apply_sobel_filter( image ) ;

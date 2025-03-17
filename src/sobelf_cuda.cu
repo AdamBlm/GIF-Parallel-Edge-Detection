@@ -1,16 +1,26 @@
 /*
- * INF560
+ * INF560 - Image Filtering Project (CUDA version)
  *
- * Image Filtering Project
+ * This application loads a GIF image using our in-house gif_lib,
+ * transfers each frame to the GPU, applies three filters (grayscale, blur, and Sobel)
+ * using CUDA kernels with shared memory tiling, and then transfers the result back
+ * to the host to write out the modified GIF.
+ *
+ *
+ * Compile with (example):
+ *   nvcc -o sobelf_cuda sobelf_cuda.cu dgif_lib.c egif_lib.c gif_err.c gif_font.c gif_hash.c gifalloc.c openbsd-reallocarray.c quantize.c -lm -Xcompiler -fopenmp
+ *
+ * Run with:
+ *   ./sobelf_cuda input.gif output.gif
  */
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <math.h>
 #include <sys/time.h>
-
 #include "gif_lib.h"
+#include <cuda_runtime.h>
 
-/* Set this macro to 1 to enable debugging information */
 #define SOBELF_DEBUG 0
 
 /* Represent one pixel from the image */
@@ -573,346 +583,282 @@ store_pixels( char * filename, animated_gif * image )
     return 1 ;
 }
 
-void
-apply_gray_filter( animated_gif * image )
+// Kernel for converting an image to grayscale
+__global__ void grayscaleKernel(pixel *d_pixels, int width, int height)
 {
-    int i, j ;
-    pixel ** p ;
+    int x = blockIdx.x * blockDim.x + threadIdx.x;
+    int y = blockIdx.y * blockDim.y + threadIdx.y;
+    if(x < width && y < height){
+        int idx = y * width + x;
+        int gray = (d_pixels[idx].r + d_pixels[idx].g + d_pixels[idx].b) / 3;
+        d_pixels[idx].r = gray;
+        d_pixels[idx].g = gray;
+        d_pixels[idx].b = gray;
+    }
+}
+__global__ void blurKernel(pixel *d_in, pixel *d_out, int width, int height)
+{
+    extern __shared__ pixel s_data[];
+    int tx = threadIdx.x, ty = threadIdx.y;
+    int bx = blockIdx.x * blockDim.x, by = blockIdx.y * blockDim.y;
+    int x = bx + tx, y = by + ty;
+    int tileWidth = blockDim.x + 2;
+    int sm_x = tx + 1, sm_y = ty + 1;
 
-    p = image->p ;
+    // Load center pixel if in range.
+    if(x < width && y < height)
+        s_data[sm_y * tileWidth + sm_x] = d_in[y * width + x];
 
-    for ( i = 0 ; i < image->n_images ; i++ )
+    // Load halo pixels
+    if(tx == 0 && x > 0)
+        s_data[sm_y * tileWidth + 0] = d_in[y * width + (x - 1)];
+    if(tx == blockDim.x - 1 && x < width - 1)
+        s_data[sm_y * tileWidth + sm_x + 1] = d_in[y * width + (x + 1)];
+    if(ty == 0 && y > 0)
+        s_data[0 * tileWidth + sm_x] = d_in[(y - 1) * width + x];
+    if(ty == blockDim.y - 1 && y < height - 1)
+        s_data[(sm_y + 1) * tileWidth + sm_x] = d_in[(y + 1) * width + x];
+    __syncthreads();
+
+    // Only process interior pixels that have a full  cross-neighborhood.
+    if(x > 0 && x < width - 1 && y > 0 && y < height - 1)
     {
-        for ( j = 0 ; j < image->width[i] * image->height[i] ; j++ )
-        {
-            int moy ;
+        // Compute a weighted sum using a cross pattern:
+        // weight center*4, each direct neighbor weight 1
+        int center = s_data[sm_y * tileWidth + sm_x].r; // assume grayscale so any channel works
+        int left   = s_data[sm_y * tileWidth + (sm_x - 1)].r;
+        int right  = s_data[sm_y * tileWidth + (sm_x + 1)].r;
+        int top    = s_data[(sm_y - 1) * tileWidth + sm_x].r;
+        int bottom = s_data[(sm_y + 1) * tileWidth + sm_x].r;
+        int newVal = (4 * center + left + right + top + bottom) / 8;
 
-            moy = (p[i][j].r + p[i][j].g + p[i][j].b)/3 ;
-            if ( moy < 0 ) moy = 0 ;
-            if ( moy > 255 ) moy = 255 ;
+        int idx = y * width + x;
+        // Apply new value to all channels.
+        d_out[idx].r = newVal;
+        d_out[idx].g = newVal;
+        d_out[idx].b = newVal;
+    }
+}
 
-            p[i][j].r = moy ;
-            p[i][j].g = moy ;
-            p[i][j].b = moy ;
+// Sobel kernel using shared memory tiling (operating on the blue channel)
+__global__ void sobelKernel(pixel *d_in, pixel *d_out, int width, int height)
+{
+    extern __shared__ pixel s_data[];
+    int tx = threadIdx.x, ty = threadIdx.y;
+    int bx = blockIdx.x * blockDim.x, by = blockIdx.y * blockDim.y;
+    int x = bx + tx, y = by + ty;
+    int tileWidth = blockDim.x + 2;
+    int sm_x = tx + 1, sm_y = ty + 1;
+
+    if(x < width && y < height)
+        s_data[sm_y * tileWidth + sm_x] = d_in[y * width + x];
+    if(tx == 0 && x > 0)
+        s_data[sm_y * tileWidth + 0] = d_in[y * width + (x - 1)];
+    if(tx == blockDim.x - 1 && x < width - 1)
+        s_data[sm_y * tileWidth + sm_x + 1] = d_in[y * width + (x + 1)];
+    if(ty == 0 && y > 0)
+        s_data[0 * tileWidth + sm_x] = d_in[(y - 1) * width + x];
+    if(ty == blockDim.y - 1 && y < height - 1)
+        s_data[(sm_y + 1) * tileWidth + sm_x] = d_in[(y + 1) * width + x];
+    if(tx == 0 && ty == 0 && x > 0 && y > 0)
+        s_data[0] = d_in[(y - 1) * width + (x - 1)];
+    if(tx == blockDim.x - 1 && ty == 0 && x < width - 1 && y > 0)
+        s_data[0 * tileWidth + sm_x + 1] = d_in[(y - 1) * width + (x + 1)];
+    if(tx == 0 && ty == blockDim.y - 1 && x > 0 && y < height - 1)
+        s_data[(sm_y + 1) * tileWidth + 0] = d_in[(y + 1) * width + (x - 1)];
+    if(tx == blockDim.x - 1 && ty == blockDim.y - 1 && x < width - 1 && y < height - 1)
+        s_data[(sm_y + 1) * tileWidth + sm_x + 1] = d_in[(y + 1) * width + (x + 1)];
+    __syncthreads();
+
+    if(x > 0 && x < width - 1 && y > 0 && y < height - 1)
+    {
+        int Gx = - s_data[(sm_y - 1) * tileWidth + (sm_x - 1)].b
+                 - 2 * s_data[sm_y * tileWidth + (sm_x - 1)].b
+                 - s_data[(sm_y + 1) * tileWidth + (sm_x - 1)].b
+                 + s_data[(sm_y - 1) * tileWidth + (sm_x + 1)].b
+                 + 2 * s_data[sm_y * tileWidth + (sm_x + 1)].b
+                 + s_data[(sm_y + 1) * tileWidth + (sm_x + 1)].b;
+        int Gy = s_data[(sm_y - 1) * tileWidth + (sm_x + 1)].b
+                 + 2 * s_data[(sm_y - 1) * tileWidth + sm_x].b
+                 + s_data[(sm_y - 1) * tileWidth + (sm_x - 1)].b
+                 - s_data[(sm_y + 1) * tileWidth + (sm_x - 1)].b
+                 - 2 * s_data[(sm_y + 1) * tileWidth + sm_x].b
+                 - s_data[(sm_y + 1) * tileWidth + (sm_x + 1)].b;
+        int magnitude = (int)(sqrtf((float)(Gx * Gx + Gy * Gy)) / 4.0f);
+        int idx = y * width + x;
+        if(magnitude > 35) {
+            d_out[idx].r = 255;
+            d_out[idx].g = 255;
+            d_out[idx].b = 255;
+        } else {
+            d_out[idx].r = 0;
+            d_out[idx].g = 0;
+            d_out[idx].b = 0;
         }
     }
 }
 
-#define CONV(l,c,nb_c) \
-    (l)*(nb_c)+(c)
 
-void apply_gray_line( animated_gif * image ) 
-{
-    int i, j, k ;
-    pixel ** p ;
+/* --------------------------------------------------------------------
+   Tiling parameters.
+   -------------------------------------------------------------------- */
+#define TILE_WIDTH 1024
+#define TILE_HEIGHT 1024
 
-    p = image->p ;
+/* --------------------------------------------------------------------
+   process_tile(): Process one tile of an image on the GPU.
+   -------------------------------------------------------------------- */
+void process_tile(pixel *tile_in, pixel *tile_out, int tile_w, int tile_h) {
+    size_t tileSizeBytes = tile_w * tile_h * sizeof(pixel);
+    pixel *d_in, *d_out;
+    cudaError_t err;
 
-    for ( i = 0 ; i < image->n_images ; i++ )
-    {
-        for ( j = 0 ; j < 10 ; j++ )
-        {
-            for ( k = image->width[i]/2 ; k < image->width[i] ; k++ )
-            {
-            p[i][CONV(j,k,image->width[i])].r = 0 ;
-            p[i][CONV(j,k,image->width[i])].g = 0 ;
-            p[i][CONV(j,k,image->width[i])].b = 0 ;
-            }
-        }
+    err = cudaMalloc((void**)&d_in, tileSizeBytes);
+    if(err != cudaSuccess) {
+        fprintf(stderr, "ERROR: cudaMalloc d_in for tile: %s\n", cudaGetErrorString(err));
+        exit(1);
     }
-}
+    err = cudaMalloc((void**)&d_out, tileSizeBytes);
+    if(err != cudaSuccess) {
+        fprintf(stderr, "ERROR: cudaMalloc d_out for tile: %s\n", cudaGetErrorString(err));
+        exit(1);
+    }
+    err = cudaMemcpy(d_in, tile_in, tileSizeBytes, cudaMemcpyHostToDevice);
+    if(err != cudaSuccess)
+        fprintf(stderr, "ERROR: cudaMemcpy to d_in for tile: %s\n", cudaGetErrorString(err));
 
-void
-apply_blur_filter( animated_gif * image, int size, int threshold )
-{
-    int i, j, k ;
-    int width, height ;
-    int end = 0 ;
-    int n_iter = 0 ;
+    dim3 blockDim(16,16);
+    dim3 gridDim((tile_w + blockDim.x - 1) / blockDim.x, (tile_h + blockDim.y - 1) / blockDim.y);
+    size_t sharedMemSize = (blockDim.x + 2) * (blockDim.y + 2) * sizeof(pixel);
 
-    pixel ** p ;
-    pixel * new ;
+    // Grayscale kernel
+    grayscaleKernel<<<gridDim, blockDim>>>(d_in, tile_w, tile_h);
+    cudaDeviceSynchronize();
+    err = cudaGetLastError();
+    if(err != cudaSuccess)
+        fprintf(stderr, "ERROR: After grayscaleKernel: %s\n", cudaGetErrorString(err));
 
-    /* Get the pixels of all images */
-    p = image->p ;
+    // Blur kernel
+    blurKernel<<<gridDim, blockDim, sharedMemSize>>>(d_in, d_out, tile_w, tile_h);
+    cudaDeviceSynchronize();
+    err = cudaGetLastError();
+    if(err != cudaSuccess)
+        fprintf(stderr, "ERROR: After blurKernel: %s\n", cudaGetErrorString(err));
 
+    // Copy blurred result back into d_in.
+    cudaMemcpy(d_in, d_out, tileSizeBytes, cudaMemcpyDeviceToDevice);
 
-    /* Process all images */
-    for ( i = 0 ; i < image->n_images ; i++ )
-    {
-        n_iter = 0 ;
-        width = image->width[i] ;
-        height = image->height[i] ;
+    // Sobel kernel with timing debug.
+    cudaEvent_t start, stop;
+    cudaEventCreate(&start);
+    cudaEventCreate(&stop);
+    cudaEventRecord(start, 0);
+    sobelKernel<<<gridDim, blockDim, sharedMemSize>>>(d_in, d_out, tile_w, tile_h);
+    cudaEventRecord(stop, 0);
+    cudaEventSynchronize(stop);
+    float elapsed_ms;
+    cudaEventElapsedTime(&elapsed_ms, start, stop);
+   
+    cudaEventDestroy(start);
+    cudaEventDestroy(stop);
 
-        /* Allocate array of new pixels */
-        new = (pixel *)malloc(width * height * sizeof( pixel ) ) ;
+    cudaMemcpy(tile_out, d_out, tileSizeBytes, cudaMemcpyDeviceToHost);
 
-
-        /* Perform at least one blur iteration */
-        do
-        {
-            end = 1 ;
-            n_iter++ ;
-
-
-	for(j=0; j<height-1; j++)
-	{
-		for(k=0; k<width-1; k++)
-		{
-			new[CONV(j,k,width)].r = p[i][CONV(j,k,width)].r ;
-			new[CONV(j,k,width)].g = p[i][CONV(j,k,width)].g ;
-			new[CONV(j,k,width)].b = p[i][CONV(j,k,width)].b ;
-		}
-	}
-
-            /* Apply blur on top part of image (10%) */
-            for(j=size; j<height/10-size; j++)
-            {
-                for(k=size; k<width-size; k++)
-                {
-                    int stencil_j, stencil_k ;
-                    int t_r = 0 ;
-                    int t_g = 0 ;
-                    int t_b = 0 ;
-
-                    for ( stencil_j = -size ; stencil_j <= size ; stencil_j++ )
-                    {
-                        for ( stencil_k = -size ; stencil_k <= size ; stencil_k++ )
-                        {
-                            t_r += p[i][CONV(j+stencil_j,k+stencil_k,width)].r ;
-                            t_g += p[i][CONV(j+stencil_j,k+stencil_k,width)].g ;
-                            t_b += p[i][CONV(j+stencil_j,k+stencil_k,width)].b ;
-                        }
-                    }
-
-                    new[CONV(j,k,width)].r = t_r / ( (2*size+1)*(2*size+1) ) ;
-                    new[CONV(j,k,width)].g = t_g / ( (2*size+1)*(2*size+1) ) ;
-                    new[CONV(j,k,width)].b = t_b / ( (2*size+1)*(2*size+1) ) ;
-                }
-            }
-
-            /* Copy the middle part of the image */
-            for(j=height/10-size; j<height*0.9+size; j++)
-            {
-                for(k=size; k<width-size; k++)
-                {
-                    new[CONV(j,k,width)].r = p[i][CONV(j,k,width)].r ; 
-                    new[CONV(j,k,width)].g = p[i][CONV(j,k,width)].g ; 
-                    new[CONV(j,k,width)].b = p[i][CONV(j,k,width)].b ; 
-                }
-            }
-
-            /* Apply blur on the bottom part of the image (10%) */
-            for(j=height*0.9+size; j<height-size; j++)
-            {
-                for(k=size; k<width-size; k++)
-                {
-                    int stencil_j, stencil_k ;
-                    int t_r = 0 ;
-                    int t_g = 0 ;
-                    int t_b = 0 ;
-
-                    for ( stencil_j = -size ; stencil_j <= size ; stencil_j++ )
-                    {
-                        for ( stencil_k = -size ; stencil_k <= size ; stencil_k++ )
-                        {
-                            t_r += p[i][CONV(j+stencil_j,k+stencil_k,width)].r ;
-                            t_g += p[i][CONV(j+stencil_j,k+stencil_k,width)].g ;
-                            t_b += p[i][CONV(j+stencil_j,k+stencil_k,width)].b ;
-                        }
-                    }
-
-                    new[CONV(j,k,width)].r = t_r / ( (2*size+1)*(2*size+1) ) ;
-                    new[CONV(j,k,width)].g = t_g / ( (2*size+1)*(2*size+1) ) ;
-                    new[CONV(j,k,width)].b = t_b / ( (2*size+1)*(2*size+1) ) ;
-                }
-            }
-
-            for(j=1; j<height-1; j++)
-            {
-                for(k=1; k<width-1; k++)
-                {
-
-                    float diff_r ;
-                    float diff_g ;
-                    float diff_b ;
-
-                    diff_r = (new[CONV(j  ,k  ,width)].r - p[i][CONV(j  ,k  ,width)].r) ;
-                    diff_g = (new[CONV(j  ,k  ,width)].g - p[i][CONV(j  ,k  ,width)].g) ;
-                    diff_b = (new[CONV(j  ,k  ,width)].b - p[i][CONV(j  ,k  ,width)].b) ;
-
-                    if ( diff_r > threshold || -diff_r > threshold 
-                            ||
-                             diff_g > threshold || -diff_g > threshold
-                             ||
-                              diff_b > threshold || -diff_b > threshold
-                       ) {
-                        end = 0 ;
-                    }
-
-                    p[i][CONV(j  ,k  ,width)].r = new[CONV(j  ,k  ,width)].r ;
-                    p[i][CONV(j  ,k  ,width)].g = new[CONV(j  ,k  ,width)].g ;
-                    p[i][CONV(j  ,k  ,width)].b = new[CONV(j  ,k  ,width)].b ;
-                }
-            }
-
-        }
-        while ( threshold > 0 && !end ) ;
+    cudaFree(d_in);
+    cudaFree(d_out);
 
 #if SOBELF_DEBUG
-	printf( "BLUR: number of iterations for image %d\n", n_iter ) ;
+    // Print a few pixel values from the tile_out (top-left corner)
+    printf("DEBUG (tile): First pixel after processing: (%d, %d, %d)\n",
+           tile_out[0].r, tile_out[0].g, tile_out[0].b);
 #endif
-
-        free (new) ;
-    }
-
 }
 
-void
-apply_sobel_filter( animated_gif * image )
+/* --------------------------------------------------------------------
+   main(): Process each image frame in tiles.
+   -------------------------------------------------------------------- */
+int main( int argc, char ** argv )
 {
-    int i, j, k ;
-    int width, height ;
-
-    pixel ** p ;
-
-    p = image->p ;
-
-    for ( i = 0 ; i < image->n_images ; i++ )
-    {
-        width = image->width[i] ;
-        height = image->height[i] ;
-
-        pixel * sobel ;
-
-        sobel = (pixel *)malloc(width * height * sizeof( pixel ) ) ;
-
-        for(j=1; j<height-1; j++)
-        {
-            for(k=1; k<width-1; k++)
-            {
-                int pixel_blue_no, pixel_blue_n, pixel_blue_ne;
-                int pixel_blue_so, pixel_blue_s, pixel_blue_se;
-                int pixel_blue_o , pixel_blue  , pixel_blue_e ;
-
-                float deltaX_blue ;
-                float deltaY_blue ;
-                float val_blue;
-
-                pixel_blue_no = p[i][CONV(j-1,k-1,width)].b ;
-                pixel_blue_n  = p[i][CONV(j-1,k  ,width)].b ;
-                pixel_blue_ne = p[i][CONV(j-1,k+1,width)].b ;
-                pixel_blue_so = p[i][CONV(j+1,k-1,width)].b ;
-                pixel_blue_s  = p[i][CONV(j+1,k  ,width)].b ;
-                pixel_blue_se = p[i][CONV(j+1,k+1,width)].b ;
-                pixel_blue_o  = p[i][CONV(j  ,k-1,width)].b ;
-                pixel_blue    = p[i][CONV(j  ,k  ,width)].b ;
-                pixel_blue_e  = p[i][CONV(j  ,k+1,width)].b ;
-
-                deltaX_blue = -pixel_blue_no + pixel_blue_ne - 2*pixel_blue_o + 2*pixel_blue_e - pixel_blue_so + pixel_blue_se;             
-
-                deltaY_blue = pixel_blue_se + 2*pixel_blue_s + pixel_blue_so - pixel_blue_ne - 2*pixel_blue_n - pixel_blue_no;
-
-                val_blue = sqrt(deltaX_blue * deltaX_blue + deltaY_blue * deltaY_blue)/4;
-
-
-                if ( val_blue > 50 ) 
-                {
-                    sobel[CONV(j  ,k  ,width)].r = 255 ;
-                    sobel[CONV(j  ,k  ,width)].g = 255 ;
-                    sobel[CONV(j  ,k  ,width)].b = 255 ;
-                } else
-                {
-                    sobel[CONV(j  ,k  ,width)].r = 0 ;
-                    sobel[CONV(j  ,k  ,width)].g = 0 ;
-                    sobel[CONV(j  ,k  ,width)].b = 0 ;
-                }
-            }
-        }
-
-        for(j=1; j<height-1; j++)
-        {
-            for(k=1; k<width-1; k++)
-            {
-                p[i][CONV(j  ,k  ,width)].r = sobel[CONV(j  ,k  ,width)].r ;
-                p[i][CONV(j  ,k  ,width)].g = sobel[CONV(j  ,k  ,width)].g ;
-                p[i][CONV(j  ,k  ,width)].b = sobel[CONV(j  ,k  ,width)].b ;
-            }
-        }
-
-        free (sobel) ;
+    if(argc < 3) {
+        fprintf(stderr, "Usage: %s input.gif output.gif\n", argv[0]);
+        return 1;
     }
-
-}
-
-/*
- * Main entry point
- */
-int 
-main( int argc, char ** argv )
-{
-    char * input_filename ; 
-    char * output_filename ;
-    animated_gif * image ;
+    
+    char * input_filename = argv[1];
+    char * output_filename = argv[2];
+    
     struct timeval t1, t2;
-    double duration ;
-
-    /* Check command-line arguments */
-    if ( argc < 3 )
-    {
-        fprintf( stderr, "Usage: %s input.gif output.gif \n", argv[0] ) ;
-        return 1 ;
+    double duration;
+    
+    animated_gif * image = load_pixels( input_filename );
+    if(image == NULL) {
+        fprintf(stderr, "Error loading GIF\n");
+        return 1;
     }
-
-    input_filename = argv[1] ;
-    output_filename = argv[2] ;
-
-    /* IMPORT Timer start */
+    printf("DEBUG: GIF loaded from file %s with %d image(s)\n", input_filename, image->n_images);
+    
+    // Process each image (frame) in tiles.
+    for (int img = 0; img < image->n_images; img++) {
+        int w = image->width[img];
+        int h = image->height[img];
+        printf("DEBUG: Processing image %d, dimensions: %d x %d\n", img, w, h);
+        
+        // Allocate a temporary buffer for the processed image.
+        pixel *temp = (pixel *)malloc(w * h * sizeof(pixel));
+        if(temp == NULL) {
+            fprintf(stderr, "ERROR: Failed to allocate host memory for image %d\n", img);
+            exit(1);
+        }
+        
+        // Process image in tiles.
+        for (int y = 0; y < h; y += TILE_HEIGHT) {
+            for (int x = 0; x < w; x += TILE_WIDTH) {
+                int currentTileWidth = (x + TILE_WIDTH > w) ? (w - x) : TILE_WIDTH;
+                int currentTileHeight = (y + TILE_HEIGHT > h) ? (h - y) : TILE_HEIGHT;
+                size_t tileSize = currentTileWidth * currentTileHeight * sizeof(pixel);
+                
+                pixel *tile_in = (pixel *)malloc(tileSize);
+                pixel *tile_out = (pixel *)malloc(tileSize);
+                if(!tile_in || !tile_out) {
+                    fprintf(stderr, "ERROR: Unable to allocate tile buffers.\n");
+                    exit(1);
+                }
+                
+                // Copy tile from the full image.
+                for (int j = 0; j < currentTileHeight; j++) {
+                    memcpy(&tile_in[j * currentTileWidth],
+                           &image->p[img][(y + j) * w + x],
+                           currentTileWidth * sizeof(pixel));
+                }
+                
+               
+                process_tile(tile_in, tile_out, currentTileWidth, currentTileHeight);
+                
+                // Copy processed tile back into the temporary full-image buffer.
+                for (int j = 0; j < currentTileHeight; j++) {
+                    memcpy(&temp[(y + j) * w + x],
+                           &tile_out[j * currentTileWidth],
+                           currentTileWidth * sizeof(pixel));
+                }
+                
+                free(tile_in);
+                free(tile_out);
+            }
+        }
+        
+        // Replace original frame with processed image.
+        memcpy(image->p[img], temp, w * h * sizeof(pixel));
+        free(temp);
+    }
+    
     gettimeofday(&t1, NULL);
-
-    /* Load file and store the pixels in array */
-    image = load_pixels( input_filename ) ;
-    if ( image == NULL ) { return 1 ; }
-
-    /* IMPORT Timer stop */
+    if(!store_pixels(output_filename, image)) {
+        fprintf(stderr, "Error storing GIF\n");
+        return 1;
+    }
     gettimeofday(&t2, NULL);
-
-    duration = (t2.tv_sec -t1.tv_sec)+((t2.tv_usec-t1.tv_usec)/1e6);
-
-    printf( "GIF loaded from file %s with %d image(s) in %lf s\n", 
-            input_filename, image->n_images, duration ) ;
-
-    /* FILTER Timer start */
-    gettimeofday(&t1, NULL);
-
-    /* Convert the pixels into grayscale */
-    apply_gray_filter( image ) ;
-
-    /* Apply blur filter with convergence value */
-     apply_blur_filter( image, 5, 20 ) ;  
-
-    /* Apply sobel filter on pixels */
-    apply_sobel_filter( image ) ;
-
-    /* FILTER Timer stop */
-    gettimeofday(&t2, NULL);
-
-    duration = (t2.tv_sec -t1.tv_sec)+((t2.tv_usec-t1.tv_usec)/1e6);
-
-    printf( "SOBEL done in %lf s\n", duration ) ;
-
-    /* EXPORT Timer start */
-    gettimeofday(&t1, NULL);
-
-    /* Store file from array of pixels to GIF file */
-    if ( !store_pixels( output_filename, image ) ) { return 1 ; }
-
-    /* EXPORT Timer stop */
-    gettimeofday(&t2, NULL);
-
-    duration = (t2.tv_sec -t1.tv_sec)+((t2.tv_usec-t1.tv_usec)/1e6);
-
-    printf( "Export done in %lf s in file %s\n", duration, output_filename ) ;
-
-    return 0 ;
+    duration = (t2.tv_sec - t1.tv_sec) + ((t2.tv_usec - t1.tv_usec) / 1e6);
+    printf("DEBUG: Export done in %lf s in file %s\n", duration, output_filename);
+    
+    return 0;
 }
