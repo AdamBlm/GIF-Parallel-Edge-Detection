@@ -1,0 +1,11 @@
+Image,NumFrames,OpenMP,MPI_Domain,CUDA
+noise_frames_10,10,,0.004,
+noise_frames_1,1,0.006931,0.002,0.206582
+noise_frames_2,2,,0.003,
+noise_frames_3,3,,0.003,
+noise_frames_4,4,,0.003,
+noise_frames_5,5,,0.003,
+noise_frames_6,6,,0.003,
+noise_frames_7,7,,0.004,
+noise_frames_8,8,,0.003,
+noise_frames_9,9,,0.004,

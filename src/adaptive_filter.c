@@ -257,8 +257,6 @@ int main(int argc, char **argv)
          // Use auto selection.
     }
 
-
-
     MPI_Finalize();
     return 0;
 }

@@ -1,0 +1,7 @@
+To compare OMP with sequential with thread:
+./compare_seq_omp.sh 8
+
+
+./compare_all.sh [num_threads] [num_processes]
+
+./compare_campusplan.sh
