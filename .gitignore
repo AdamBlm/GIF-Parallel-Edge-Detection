@@ -1,6 +1,7 @@
 # Ignore large files
 images/original/test_ivain_1.gif
 images/processed
+output
 
 # Ignore build files
 *.o

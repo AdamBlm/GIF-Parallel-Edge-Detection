@@ -26,7 +26,8 @@
 #include <math.h>
 #include <sys/time.h>
 #include <string.h>
-#include "gif_lib.h"
+#include <gif_lib.h>  /* Directly include the gif library header */
+
 /* Set this macro to 1 to enable debugging information */
 #define SOBELF_DEBUG 0
 
@@ -38,7 +39,7 @@ typedef struct pixel
     int b ; /* Blue */
 } pixel ;
 
-/* Represent one GIF image (animated or not */
+/* Represent one GIF image (animated or not) */
 typedef struct animated_gif
 {
     int n_images ; /* Number of images */
@@ -48,9 +49,6 @@ typedef struct animated_gif
     GifFileType * g ; /* Internal representation.
                          DO NOT MODIFY */
 } animated_gif ;
-
-/* External function declaration for store_pixels */
-int store_pixels(char * filename, animated_gif * image);
 
 /*
  * Load a GIF image from a file and return a
@@ -82,7 +80,7 @@ load_pixels( char * filename )
     if ( error != GIF_OK )
     {
         fprintf( stderr, 
-                "Error DGifSlurp: %d <%s>\n", error, GifErrorString(g->Error) ) ;
+                "Error DGifSlurp: %d <%s>\n", error, GifErrorString(error) ) ;
         return NULL ;
     }
 
@@ -248,105 +246,16 @@ output_modified_read_gif( char * filename, GifFileType * g )
     if ( error2 != GIF_OK ) 
     {
         fprintf( stderr, "Error after writing g2: %d <%s>\n", 
-                error2, GifErrorString(g2->Error) ) ;
+                error2, GifErrorString(error2) ) ;
         return 0 ;
     }
 
     return 1 ;
 }
 
-/* Helper for collective operations - taken from the OpenMP+MPI version */
-typedef struct scatter_info {
-    int *sendcounts;  /* Number of elements to send to each process */
-    int *displs;      /* Displacement for each process */
-    int *image_counts; /* Number of images per process */
-    int *image_displs; /* Displacement for image indices */
-    int *scatter_byte_counts; /* Number of bytes to send to each process */
-    int *scatter_byte_displs; /* Byte displacement for each process */
-} scatter_info;
 
-/* Create scatter/gather information for collective operations */
-scatter_info* create_scatter_info(int n_images, int size)
-{
-    scatter_info* info = (scatter_info*)malloc(sizeof(scatter_info));
-    if (!info) return NULL;
-    
-    info->sendcounts = (int*)calloc(size, sizeof(int));
-    info->displs = (int*)calloc(size, sizeof(int));
-    info->image_counts = (int*)calloc(size, sizeof(int));
-    info->image_displs = (int*)calloc(size, sizeof(int));
-    info->scatter_byte_counts = (int*)calloc(size, sizeof(int));
-    info->scatter_byte_displs = (int*)calloc(size, sizeof(int));
-    
-    if (!info->sendcounts || !info->displs || 
-        !info->image_counts || !info->image_displs ||
-        !info->scatter_byte_counts || !info->scatter_byte_displs) {
-        // Free allocated memory if any allocation failed
-        if (info->sendcounts) free(info->sendcounts);
-        if (info->displs) free(info->displs);
-        if (info->image_counts) free(info->image_counts);
-        if (info->image_displs) free(info->image_displs);
-        if (info->scatter_byte_counts) free(info->scatter_byte_counts);
-        if (info->scatter_byte_displs) free(info->scatter_byte_displs);
-        free(info);
-        return NULL;
-    }
-    
-    // Distribute images evenly among processes
-    int base_count = n_images / size;
-    int remainder = n_images % size;
-    
-    for (int i = 0; i < size; i++) {
-        info->image_counts[i] = base_count + (i < remainder ? 1 : 0);
-        if (i > 0) {
-            info->image_displs[i] = info->image_displs[i-1] + info->image_counts[i-1];
-        }
-    }
-    
-    return info;
-}
-
-// Free scatter/gather information
-void free_scatter_info(scatter_info *info)
-{
-    if (info) {
-        if (info->sendcounts) free(info->sendcounts);
-        if (info->displs) free(info->displs);
-        if (info->image_counts) free(info->image_counts);
-        if (info->image_displs) free(info->image_displs);
-        if (info->scatter_byte_counts) free(info->scatter_byte_counts);
-        if (info->scatter_byte_displs) free(info->scatter_byte_displs);
-        free(info);
-    }
-}
-
-// Calculate scatter/gather counts for pixel data
-void calculate_pixel_counts(scatter_info* scatter_data, int* widths, int* heights, int size) {
-    if (!scatter_data || !widths || !heights) return;
-    
-    // Calculate displacements and pixel counts
-    for (int i = 0; i < size; i++) {
-        int start_img = scatter_data->image_displs[i];
-        int end_img = start_img + scatter_data->image_counts[i];
-        
-        scatter_data->sendcounts[i] = 0;
-        for (int j = start_img; j < end_img; j++) {
-            scatter_data->sendcounts[i] += widths[j] * heights[j];
-        }
-        
-        if (i > 0) {
-            scatter_data->displs[i] = scatter_data->displs[i-1] + scatter_data->sendcounts[i-1];
-        }
-        
-        // Pre-calculate byte counts and displacements to avoid redundant calculations
-        scatter_data->scatter_byte_counts[i] = scatter_data->sendcounts[i] * sizeof(pixel);
-        scatter_data->scatter_byte_displs[i] = scatter_data->displs[i] * sizeof(pixel);
-    }
-}
-
-/* Modified store_pixels function with color quantization for handling large color palettes */
 int
-store_pixels_optimized( char * filename, animated_gif * image )
+store_pixels( char * filename, animated_gif * image )
 {
     int n_colors = 0 ;
     pixel ** p ;
@@ -575,32 +484,6 @@ store_pixels_optimized( char * filename, animated_gif * image )
 
     p = image->p ;
 
-    /* 
-     * Color quantization step 
-     * Convert colors to a reduced palette before processing 
-     * This ensures we don't exceed the 256 color limit for GIF files
-     */
-    
-    // Apply extreme quantization - convert to just black and white (2 colors total)
-    // This is the most aggressive approach possible
-    for(i = 0; i < image->n_images; i++) {
-        for (j = 0; j < image->width[i] * image->height[i]; j++) {
-            // Calculate luminance
-            int lum = (p[i][j].r + p[i][j].g + p[i][j].b) / 3;
-            
-            // Convert to pure black or white (binary)
-            if (lum > 127) {
-                p[i][j].r = 255;
-                p[i][j].g = 255;
-                p[i][j].b = 255;
-            } else {
-                p[i][j].r = 0;
-                p[i][j].g = 0;
-                p[i][j].b = 0;
-            }
-        }
-    }
-
     /* Find the number of colors inside the image */
     for ( i = 0 ; i < image->n_images ; i++ )
     {
@@ -701,11 +584,13 @@ store_pixels_optimized( char * filename, animated_gif * image )
         }
     }
 
+
     /* Write the final image */
     if ( !output_modified_read_gif( filename, image->g ) ) { return 0 ; }
 
     return 1 ;
 }
+
 
 void
 apply_gray_filter( animated_gif * image )
@@ -757,7 +642,7 @@ void apply_gray_line( animated_gif * image )
 }
 
 void
-apply_blur_filter(animated_gif * image, int size, int threshold)
+apply_blur_filter( animated_gif * image, int size, int threshold )
 {
     int i, j, k;
     int width, height;
@@ -883,7 +768,7 @@ apply_blur_filter(animated_gif * image, int size, int threshold)
 }
 
 void
-apply_sobel_filter( animated_gif * image )
+apply_sobel_filter(animated_gif * image)
 {
     int i, j, k;
     int width, height;
@@ -994,7 +879,7 @@ apply_sobel_filter( animated_gif * image )
                 if (val_blue > max_val) max_val = val_blue;
 
                 // Apply binary thresholding for edge detection
-                if (max_val > 15)  // Adjusted threshold to get visible edges
+                if (max_val > 15)  // Use threshold 15 to match sequential.c
                 {
                     sobel_buffer[i][CONV(j, k, width)].r = 255;
                     sobel_buffer[i][CONV(j, k, width)].g = 255;
@@ -1029,463 +914,160 @@ apply_sobel_filter( animated_gif * image )
     free(sobel_buffer);
 }
 
-/* Apply gray filter to a single frame */
-void apply_gray_filter_frame(animated_gif * image, int frame_idx)
-{
-    int j, k;
-    pixel ** p = image->p;
-    int width = image->width[frame_idx];
-    int height = image->height[frame_idx];
-    
-    for (j = 0; j < height; j++)
-    {
-        for (k = 0; k < width; k++)
-        {
-            int index = CONV(j, k, width);
-            int moy = (p[frame_idx][index].r + p[frame_idx][index].g + p[frame_idx][index].b)/3;
-            if (moy < 0) moy = 0;
-            if (moy > 255) moy = 255;
 
-            p[frame_idx][index].r = moy;
-            p[frame_idx][index].g = moy;
-            p[frame_idx][index].b = moy;
-        }
-    }
-}
 
-/* Reduce the number of colors in the image to avoid exceeding GIF limit of 256 colors */
-void quantize_colors(animated_gif * image)
-{
-    int i, j;
-    pixel ** p = image->p;
-    
-    // Since we're doing edge detection, we actually only need 2 colors: black and white
-    // This is the most aggressive quantization possible
-    for (i = 0; i < image->n_images; i++) {
-        for (j = 0; j < image->width[i] * image->height[i]; j++) {
-            // Calculate grayscale value
-            int gray = (p[i][j].r + p[i][j].g + p[i][j].b) / 3;
-            
-            // Convert to strictly black or white (no intermediate values)
-            if (gray > 127) {
-                p[i][j].r = 255;
-                p[i][j].g = 255;
-                p[i][j].b = 255;
-            } else {
-                p[i][j].r = 0;
-                p[i][j].g = 0;
-                p[i][j].b = 0;
-            }
-        }
-    }
-}
-
-/* 
- * Main entry point - Optimized MPI Implementation
- */
-int main(int argc, char **argv)
-{
-    char *input_filename;
-    char *output_filename;
-    animated_gif *image = NULL;
-    struct timeval t1, t2;
-    double duration;
-    int rank, size;
-    MPI_Status status;
-    scatter_info *scatter_data = NULL;
-
-    /* Initialize MPI */
+int main(int argc, char **argv) {
     MPI_Init(&argc, &argv);
+    int rank, size;
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
     MPI_Comm_size(MPI_COMM_WORLD, &size);
-
-    /* Check command-line arguments */
-    if (argc < 3)
-    {
-        if (rank == 0) {
-            fprintf(stderr, "Usage: %s input.gif output.gif\n", argv[0]);
-        }
-        MPI_Finalize();
-        return 1;
-    }
-
-    input_filename = argv[1];
-    output_filename = argv[2];
-
-    if (rank == 0) {
-        printf("Using %d MPI processes\n", size);
-    }
-
-    int n_images = 0;
-    int *image_widths = NULL;
-    int *image_heights = NULL;
     
-    /* Process 0 (master) loads the image */
-    if (rank == 0)
-    {
-        /* IMPORT Timer start */
-        gettimeofday(&t1, NULL);
-
-        /* Load file and store the pixels in array */
-        image = load_pixels(input_filename);
-        if (image == NULL) { 
+    char *input_filename, *output_filename;
+    animated_gif *image = NULL;
+    int n_images = 0;
+    struct timeval t1, t2;
+    double duration;
+    
+    if (rank == 0) {
+        if (argc < 3) {
+            fprintf(stderr, "Usage: %s input.gif output.gif\n", argv[0]);
             MPI_Abort(MPI_COMM_WORLD, 1);
-            return 1; 
         }
-
-        /* IMPORT Timer stop */
+        input_filename = argv[1];
+        output_filename = argv[2];
+        
+        gettimeofday(&t1, NULL);
+        image = load_pixels(input_filename);
+        if (!image) {
+            fprintf(stderr, "Error loading GIF\n");
+            MPI_Abort(MPI_COMM_WORLD, 1);
+        }
+        n_images = image->n_images;
         gettimeofday(&t2, NULL);
         duration = (t2.tv_sec - t1.tv_sec) + ((t2.tv_usec - t1.tv_usec) / 1e6);
         printf("GIF loaded from file %s with %d image(s) in %lf s\n", 
-                input_filename, image->n_images, duration);
-                
-        n_images = image->n_images;
-        image_widths = image->width;
-        image_heights = image->height;
-        
-        // Create scatter info for workload distribution
-        scatter_data = create_scatter_info(n_images, size);
-        if (!scatter_data) {
-            fprintf(stderr, "Failed to allocate scatter info\n");
-            MPI_Abort(MPI_COMM_WORLD, 1);
-            return 1;
-        }
-        
-        // Calculate pixel counts for each process
-        calculate_pixel_counts(scatter_data, image_widths, image_heights, size);
+               input_filename, image->n_images, duration);
     }
+    
 
-    /* FILTER Timer start */
-    MPI_Barrier(MPI_COMM_WORLD);
-    if (rank == 0) {
-        gettimeofday(&t1, NULL);
-    }
-
-    /* Broadcast the number of images to all processes */
     MPI_Bcast(&n_images, 1, MPI_INT, 0, MPI_COMM_WORLD);
     
-    /* Allocate memory for image dimensions on all processes */
-    if (rank != 0) {
-        image_widths = (int*)malloc(n_images * sizeof(int));
-        image_heights = (int*)malloc(n_images * sizeof(int));
-        if (!image_widths || !image_heights) {
-            fprintf(stderr, "Process %d: Memory allocation failed\n", rank);
-            MPI_Abort(MPI_COMM_WORLD, 1);
-            return 1;
-        }
-    }
-    
-    /* Broadcast all dimensions at once */
-    MPI_Bcast(image_widths, n_images, MPI_INT, 0, MPI_COMM_WORLD);
-    MPI_Bcast(image_heights, n_images, MPI_INT, 0, MPI_COMM_WORLD);
 
-    /* Distribute scatter information to all processes */
-    if (rank != 0) {
-        scatter_data = create_scatter_info(n_images, size);
-        if (!scatter_data) {
-            fprintf(stderr, "Process %d: Failed to allocate scatter info\n", rank);
-            MPI_Abort(MPI_COMM_WORLD, 1);
-            return 1;
-        }
-    }
+    MPI_Barrier(MPI_COMM_WORLD);
     
-    /* Broadcast scatter info arrays in a single operation */
-    int total_scatter_info_size = size * 4;
-    int* all_scatter_info = NULL;
+
+    int frames_per_proc = n_images / size;
+    int remainder = n_images % size;
+    int start = rank * frames_per_proc + (rank < remainder ? rank : remainder);
+    int count = frames_per_proc + (rank < remainder ? 1 : 0);
+    int end = start + count;
+    
+
+    animated_gif local_img;
+    local_img.n_images = count;
+    local_img.width = (int *)malloc(count * sizeof(int));
+    local_img.height = (int *)malloc(count * sizeof(int));
+    local_img.p = (pixel **)malloc(count * sizeof(pixel *));
+    local_img.g = NULL;  
     
     if (rank == 0) {
-        all_scatter_info = (int*)malloc(total_scatter_info_size * sizeof(int));
-        if (!all_scatter_info) {
-            fprintf(stderr, "Process 0: Failed to allocate scatter info buffer\n");
-            MPI_Abort(MPI_COMM_WORLD, 1);
-            return 1;
-        }
-        
-        // Pack all scatter arrays into a single buffer for efficient transfer
-        memcpy(&all_scatter_info[0], scatter_data->image_counts, size * sizeof(int));
-        memcpy(&all_scatter_info[size], scatter_data->image_displs, size * sizeof(int));
-        memcpy(&all_scatter_info[size*2], scatter_data->sendcounts, size * sizeof(int));
-        memcpy(&all_scatter_info[size*3], scatter_data->displs, size * sizeof(int));
-    } else {
-        all_scatter_info = (int*)malloc(total_scatter_info_size * sizeof(int));
-        if (!all_scatter_info) {
-            fprintf(stderr, "Process %d: Failed to allocate scatter info buffer\n", rank);
-            MPI_Abort(MPI_COMM_WORLD, 1);
-            return 1;
-        }
-    }
     
-    // One broadcast instead of multiple
-    MPI_Bcast(all_scatter_info, total_scatter_info_size, MPI_INT, 0, MPI_COMM_WORLD);
-    
-    if (rank != 0) {
-        // Unpack the received data
-        memcpy(scatter_data->image_counts, &all_scatter_info[0], size * sizeof(int));
-        memcpy(scatter_data->image_displs, &all_scatter_info[size], size * sizeof(int));
-        memcpy(scatter_data->sendcounts, &all_scatter_info[size*2], size * sizeof(int));
-        memcpy(scatter_data->displs, &all_scatter_info[size*3], size * sizeof(int));
-        
-        // Recalculate byte counts and displacements
-        for (int i = 0; i < size; i++) {
-            scatter_data->scatter_byte_counts[i] = scatter_data->sendcounts[i] * sizeof(pixel);
-            scatter_data->scatter_byte_displs[i] = scatter_data->displs[i] * sizeof(pixel);
+        for (int i = start, j = 0; i < end; i++, j++) {
+            local_img.width[j] = image->width[i];
+            local_img.height[j] = image->height[i];
+            int npixels = local_img.width[j] * local_img.height[j];
+            local_img.p[j] = (pixel *)malloc(npixels * sizeof(pixel));
+            memcpy(local_img.p[j], image->p[i], npixels * sizeof(pixel));
         }
-    }
-    
-    free(all_scatter_info);
 
-    /* Get information for this process */
-    int my_n_images = scatter_data->image_counts[rank];
-    int my_start_image = scatter_data->image_displs[rank];
-    
-    /* Allocate memory for local image processing */
-    animated_gif *local_image = NULL;
-    local_image = (animated_gif*)malloc(sizeof(animated_gif));
-    if (!local_image) {
-        fprintf(stderr, "Process %d: Memory allocation failed for local_image\n", rank);
-        MPI_Abort(MPI_COMM_WORLD, 1);
-        return 1;
-    }
-    
-    local_image->n_images = my_n_images;
-    local_image->width = (int*)malloc(my_n_images * sizeof(int));
-    local_image->height = (int*)malloc(my_n_images * sizeof(int));
-    local_image->p = (pixel**)malloc(my_n_images * sizeof(pixel*));
-    local_image->g = NULL; /* Not needed for processing */
-    
-    if (!local_image->width || !local_image->height || !local_image->p) {
-        fprintf(stderr, "Process %d: Memory allocation failed for local image arrays\n", rank);
-        MPI_Abort(MPI_COMM_WORLD, 1);
-        return 1;
-    }
-    
-    /* Set up local dimensions from global data */
-    for (int i = 0; i < my_n_images; i++) {
-        int global_idx = my_start_image + i;
-        local_image->width[i] = image_widths[global_idx];
-        local_image->height[i] = image_heights[global_idx];
-        
-        /* Allocate memory for pixels */
-        local_image->p[i] = (pixel*)malloc(local_image->width[i] * local_image->height[i] * sizeof(pixel));
-        if (!local_image->p[i]) {
-            fprintf(stderr, "Process %d: Memory allocation failed for image %d\n", rank, i);
-            MPI_Abort(MPI_COMM_WORLD, 1);
-            return 1;
-        }
-    }
-    
-    /* Create MPI datatype for pixel structure to ensure proper alignment */
-    MPI_Datatype mpi_pixel_type;
-    MPI_Type_contiguous(3, MPI_INT, &mpi_pixel_type); /* 3 ints: r, g, b */
-    MPI_Type_commit(&mpi_pixel_type);
-    
-    /* Use non-blocking communication for better performance */
-    MPI_Request request;
-    MPI_Status scatter_status;
-    
-    /* Create contiguous buffers for scatter/gather operations */
-    pixel *all_pixels = NULL;
-    pixel *scattered_pixels = NULL;
-    int sendcount = scatter_data->sendcounts[rank];
-    
-    if (rank == 0) {
-        /* Calculate total pixels for all processes */
-        int total_pixels = 0;
-        for (int i = 0; i < size; i++) {
-            total_pixels += scatter_data->sendcounts[i];
-        }
-        
-        /* Allocate buffer for all pixels */
-        all_pixels = (pixel*)malloc(total_pixels * sizeof(pixel));
-        if (!all_pixels) {
-            fprintf(stderr, "Process 0: Memory allocation failed for all_pixels\n");
-            MPI_Abort(MPI_COMM_WORLD, 1);
-            return 1;
-        }
-        
-        /* Copy all pixels to contiguous buffer */
-        int pixel_idx = 0;
-        for (int i = 0; i < n_images; i++) {
-            memcpy(&all_pixels[pixel_idx], image->p[i], 
-                   image_widths[i] * image_heights[i] * sizeof(pixel));
-            pixel_idx += image_widths[i] * image_heights[i];
-        }
-        
-        /* Send data to all processes including self */
-        for (int i = 0; i < size; i++) {
-            if (i == 0) {
-                /* For rank 0, just copy directly without sending */
-                scattered_pixels = (pixel*)malloc(sendcount * sizeof(pixel));
-                if (!scattered_pixels && sendcount > 0) {
-                    fprintf(stderr, "Process 0: Memory allocation failed for scattered_pixels\n");
-                    MPI_Abort(MPI_COMM_WORLD, 1);
-                    return 1;
-                }
-                memcpy(scattered_pixels, all_pixels, sendcount * sizeof(pixel));
-            } else {
-                /* Send to other processes using non-blocking send */
-                MPI_Isend(&all_pixels[scatter_data->displs[i]], 
-                         scatter_data->sendcounts[i], mpi_pixel_type,
-                         i, 0, MPI_COMM_WORLD, &request);
-                
-                /* We can immediately detach from this request since we keep the buffer until the end */
-                MPI_Request_free(&request);
+        for (int r = 1; r < size; r++) {
+            int r_start = r * frames_per_proc + (r < remainder ? r : remainder);
+            int r_count = frames_per_proc + (r < remainder ? 1 : 0);
+            for (int i = r_start; i < r_start + r_count; i++) {
+                MPI_Send(&image->width[i], 1, MPI_INT, r, 0, MPI_COMM_WORLD);
+                MPI_Send(&image->height[i], 1, MPI_INT, r, 0, MPI_COMM_WORLD);
+                int npixels = image->width[i] * image->height[i];
+                MPI_Send(image->p[i], npixels * sizeof(pixel), MPI_BYTE, r, 0, MPI_COMM_WORLD);
             }
         }
     } else {
-        /* Allocate receive buffer for scattered pixels */
-        scattered_pixels = (pixel*)malloc(sendcount * sizeof(pixel));
-        if (!scattered_pixels && sendcount > 0) {
-            fprintf(stderr, "Process %d: Memory allocation failed for scattered_pixels\n", rank);
-            MPI_Abort(MPI_COMM_WORLD, 1);
-            return 1;
-        }
-        
-        /* Receive data from process 0 */
-        MPI_Irecv(scattered_pixels, sendcount, mpi_pixel_type,
-                 0, 0, MPI_COMM_WORLD, &request);
-        
-        /* Wait for receive to complete before proceeding */
-        MPI_Wait(&request, &scatter_status);
-    }
-    
-    /* Copy scattered pixels to individual image buffers */
-    if (my_n_images > 0) {
-        int pixel_offset = 0;
-        for (int i = 0; i < my_n_images; i++) {
-            int pixel_count = local_image->width[i] * local_image->height[i];
-            memcpy(local_image->p[i], &scattered_pixels[pixel_offset], 
-                   pixel_count * sizeof(pixel));
-            pixel_offset += pixel_count;
-        }
-    }
-    
-    /* Apply filters to local images */
-    if (my_n_images > 0) {
-        /* Convert the pixels into grayscale */
-        apply_gray_filter(local_image);
-        
-        /* Apply blur filter with convergence value */
-        apply_blur_filter(local_image, 3, 5);
-        
-        /* Apply sobel filter on pixels */
-        apply_sobel_filter(local_image);
-    }
-    
-    /* Use non-blocking communication for gather as well */
-    MPI_Request gather_request;
-    MPI_Status gather_status;
-    
-    /* Reuse scattered_pixels buffer for gathering to reduce memory usage */
-    if (my_n_images > 0) {
-        int pixel_offset = 0;
-        for (int i = 0; i < my_n_images; i++) {
-            int pixel_count = local_image->width[i] * local_image->height[i];
-            memcpy(&scattered_pixels[pixel_offset], local_image->p[i], 
-                   pixel_count * sizeof(pixel));
-            pixel_offset += pixel_count;
-        }
-    }
-    
-    if (rank == 0) {
-        /* Gather data from all processes */
-        for (int i = 0; i < size; i++) {
-            if (i == 0) {
-                /* For rank 0, just copy directly into all_pixels */
-                memcpy(&all_pixels[0], scattered_pixels, sendcount * sizeof(pixel));
-            } else {
-                /* Receive from other processes using non-blocking receive */
-                MPI_Irecv(&all_pixels[scatter_data->displs[i]], 
-                         scatter_data->sendcounts[i], mpi_pixel_type,
-                         i, 1, MPI_COMM_WORLD, &request);
-                
-                /* We'll wait for all receives at the barrier below */
-                MPI_Request_free(&request);
-            }
-        }
-    } else {
-        /* Send processed data back to process 0 */
-        MPI_Isend(scattered_pixels, sendcount, mpi_pixel_type,
-                 0, 1, MPI_COMM_WORLD, &gather_request);
-        
-        /* Wait for send to complete */
-        MPI_Wait(&gather_request, &gather_status);
-    }
-    
-    /* Make sure all communication is complete before proceeding */
-    MPI_Barrier(MPI_COMM_WORLD);
-    
-    /* Free scattered_pixels as it's no longer needed */
-    if (scattered_pixels) free(scattered_pixels);
-    
-    /* Process 0 copies gathered pixels back to the image */
-    if (rank == 0) {
-        int pixel_idx = 0;
-        for (int i = 0; i < n_images; i++) {
-            memcpy(image->p[i], &all_pixels[pixel_idx], 
-                   image_widths[i] * image_heights[i] * sizeof(pixel));
-            pixel_idx += image_widths[i] * image_heights[i];
-        }
-    }
 
-    /* FILTER Timer stop */
+        for (int j = 0; j < count; j++) {
+            MPI_Recv(&local_img.width[j], 1, MPI_INT, 0, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+            MPI_Recv(&local_img.height[j], 1, MPI_INT, 0, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+            int npixels = local_img.width[j] * local_img.height[j];
+            local_img.p[j] = (pixel *)malloc(npixels * sizeof(pixel));
+            MPI_Recv(local_img.p[j], npixels * sizeof(pixel), MPI_BYTE, 0, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+        }
+    }
+    
+  
     MPI_Barrier(MPI_COMM_WORLD);
-    if (rank == 0) {
-        gettimeofday(&t2, NULL);
-        duration = (t2.tv_sec - t1.tv_sec) + ((t2.tv_usec - t1.tv_usec) / 1e6);
+
+    gettimeofday(&t1, NULL);
+    apply_gray_filter(&local_img);
+    apply_blur_filter(&local_img, 3, 0);
+    apply_sobel_filter(&local_img);
+    gettimeofday(&t2, NULL);
+    duration = (t2.tv_sec - t1.tv_sec) + ((t2.tv_usec - t1.tv_usec)/1e6);
+    if (rank == 0)
         printf("SOBEL done in %lf s\n", duration);
-        
-        /* EXPORT Timer start */
-        gettimeofday(&t1, NULL);
-
-        /* Store file from array of pixels to GIF file */
-        if (!store_pixels(output_filename, image)) { 
-            MPI_Abort(MPI_COMM_WORLD, 1);
-            return 1; 
-        }
-
-        /* EXPORT Timer stop */
-        gettimeofday(&t2, NULL);
-        duration = (t2.tv_sec - t1.tv_sec) + ((t2.tv_usec - t1.tv_usec) / 1e6);
-        printf("Export done in %lf s in file %s\n", duration, output_filename);
-    }
-
-    /* Free resources */
-    if (local_image) {
-        for (int i = 0; i < local_image->n_images; i++) {
-            if (local_image->p[i]) {
-                free(local_image->p[i]);
+ 
+    MPI_Barrier(MPI_COMM_WORLD);
+    
+  
+    if (rank == 0) {
+        for (int r = 1; r < size; r++) {
+            int r_start = r * frames_per_proc + (r < remainder ? r : remainder);
+            int r_count = frames_per_proc + (r < remainder ? 1 : 0);
+            for (int i = r_start, j = 0; i < r_start + r_count; i++, j++) {
+                int width_frame, height_frame;
+                MPI_Recv(&width_frame, 1, MPI_INT, r, 1, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+                MPI_Recv(&height_frame, 1, MPI_INT, r, 1, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+                int npixels = width_frame * height_frame;
+                MPI_Recv(image->p[i], npixels * sizeof(pixel), MPI_BYTE, r, 1, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
             }
         }
-        free(local_image->p);
-        free(local_image->width);
-        free(local_image->height);
-        free(local_image);
+      
+        for (int i = start, j = 0; i < end; i++, j++) {
+            int npixels = image->width[i] * image->height[i];
+            memcpy(image->p[i], local_img.p[j], npixels * sizeof(pixel));
+        }
+    } else {
+        for (int j = 0; j < count; j++) {
+            MPI_Send(&local_img.width[j], 1, MPI_INT, 0, 1, MPI_COMM_WORLD);
+            MPI_Send(&local_img.height[j], 1, MPI_INT, 0, 1, MPI_COMM_WORLD);
+            int npixels = local_img.width[j] * local_img.height[j];
+            MPI_Send(local_img.p[j], npixels * sizeof(pixel), MPI_BYTE, 0, 1, MPI_COMM_WORLD);
+        }
     }
     
-    if (rank == 0 && all_pixels) free(all_pixels);
+
+    for (int j = 0; j < count; j++) {
+        free(local_img.p[j]);
+    }
+    free(local_img.p);
+    free(local_img.width);
+    free(local_img.height);
     
-    free_scatter_info(scatter_data);
-    
-    if (rank == 0 && image) {
-        for (int i = 0; i < image->n_images; i++) {
-            if (image->p[i]) {
-                free(image->p[i]);
-            }
+  
+    MPI_Barrier(MPI_COMM_WORLD);
+    gettimeofday(&t1, NULL);
+    if (rank == 0) {
+        store_pixels(output_filename, image);
+      
+        for (int i = 0; i < n_images; i++) {
+            free(image->p[i]);
         }
         free(image->p);
         free(image->width);
         free(image->height);
-        free(image);
     }
-    
-    if (rank != 0) {
-        free(image_widths);
-        free(image_heights);
+    gettimeofday(&t2, NULL);
+    duration = (t2.tv_sec - t1.tv_sec) + ((t2.tv_usec - t1.tv_usec)/1e6);
+    if (rank == 0) {
+        printf("Export done in %lf s in file %s\n", duration, output_filename);
     }
-    
-    /* Free MPI datatype */
-    MPI_Type_free(&mpi_pixel_type);
     
     MPI_Finalize();
     return 0;

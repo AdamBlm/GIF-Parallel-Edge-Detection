@@ -16,7 +16,7 @@ SOBEL_OBJ_NO_UTILS = $(OBJDIR)/dgif_lib.o $(OBJDIR)/egif_lib.o $(OBJDIR)/gif_err
 sobelf_omp_mpi: $(OBJDIR)/sobelf_omp_mpi.o $(SOBEL_OBJ_NO_UTILS)
 	$(CC) $(CFLAGS) -o $@ $^ $(LDFLAGS)
 
-sobelf_mpi: sobelf_mpi.c $(SOBEL_OBJ)
+sobelf_mpi: $(SRCDIR)/sobelf_mpi.c $(SOBEL_OBJ)
 	$(CC) $(CFLAGS) $(LDFLAGS) $^ -o $@
 
 $(OBJDIR)/sobelf_omp_mpi.o: $(SRCDIR)/sobelf_omp_mpi.c

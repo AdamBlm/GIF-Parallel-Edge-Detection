@@ -247,7 +247,7 @@ fi
 echo -e "${GREEN}Compilation of all versions complete.${NC}"
 
 # Set up parameters
-INPUT_DIR=images
+INPUT_DIR=images/original
 OUTPUT_DIR=output
 mkdir -p $OUTPUT_DIR 2>/dev/null
 

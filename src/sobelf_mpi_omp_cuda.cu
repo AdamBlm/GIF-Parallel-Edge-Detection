@@ -889,11 +889,13 @@ __global__ void sobel_kernel(pixel *d_in, pixel *d_out, int width, int height)
         
         float val_b = sqrtf(Gx_b * Gx_b + Gy_b * Gy_b) / 4.0f;
         
-        // Scale for visuals and apply threshold
-        int threshold = 50;
+        // Find maximum gradient value across all channels (matching CPU implementation)
+        float max_val = val_r;
+        if (val_g > max_val) max_val = val_g;
+        if (val_b > max_val) max_val = val_b;
         
-        // Binary threshold
-        if (val_r > threshold || val_g > threshold || val_b > threshold) {
+        // Binary threshold using same threshold as CPU version (15)
+        if (max_val > 15) {
             d_out[idx].r = 255;
             d_out[idx].g = 255;
             d_out[idx].b = 255;

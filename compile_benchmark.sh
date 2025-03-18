@@ -63,7 +63,7 @@ compile_and_check "sequential" "make sobelf" "sobelf" || ((errors++))
 compile_and_check "OpenMP" "make sobelf_omp" "sobelf_omp" || ((errors++))
 
 # Compile MPI-only version
-compile_and_check "MPI-only" "make -f Makefile.mpi sobelf_mpi" "sobelf_mpi" || ((errors++))
+compile_and_check "MPI-only" "make Makefile.mpi sobelf_mpi" "sobelf_mpi" || ((errors++))
 
 # Compile MPI+OpenMP version
 compile_and_check "MPI+OpenMP" "make -f Makefile.mpi sobelf_omp_mpi" "sobelf_omp_mpi" || ((errors++))
