@@ -110,130 +110,146 @@ def plot_combined_scaling():
 
 # ------------------------- Graph 3: Weak Scaling Efficiency -------------------------
 
-# ------------------------- Graph: Weak Scaling Efficiency (Increasing Frames) -------------------------
-def plot_weak_scaling_efficiency_frames():
+
+
+def plot_weak_scaling_efficiencies():
     """
-    Reads 'data/weak_scaling_frames.csv' which has columns:
-    NumProcs, NumFrames, TotalTime.
-    Computes weak scaling efficiency as: Efficiency = T(1) / T(N)
-    and plots efficiency vs. number of processes.
+    Creates a 1x2 subplot figure for weak scaling efficiency:
+     - Left subplot: Efficiency vs. Number of Processes for increasing frames
+     - Right subplot: Efficiency vs. Number of Processes for increasing resolution
+    
+    Reads:
+      data/weak_scaling_frames.csv -> columns: NumProcs, NumFrames, TotalTime
+      data/weak_scaling_size.csv   -> columns: NumProcs, Resolution, TotalTime
+    
+    Efficiency is computed as T(1) / T(N), where T(1) is the average runtime at 1 process.
     """
+
+    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(14,6))
+    
+    # ------------------ Subplot 1: Weak Scaling (Increasing Frames) ------------------
     try:
-        df = pd.read_csv("data/weak_scaling_frames.csv")
+        df_frames = pd.read_csv("data/weak_scaling_frames.csv")
     except Exception as e:
-        print("data/weak_scaling_frames.csv not found.")
+        print("data/weak_scaling_frames.csv not found or invalid.")
         return
     
     # Convert columns to numeric
-    df["NumProcs"] = pd.to_numeric(df["NumProcs"], errors="coerce")
-    df["TotalTime"] = pd.to_numeric(df["TotalTime"], errors="coerce")
+    df_frames["NumProcs"]  = pd.to_numeric(df_frames["NumProcs"],  errors="coerce")
+    df_frames["TotalTime"] = pd.to_numeric(df_frames["TotalTime"], errors="coerce")
     
-    # Use the TotalTime for NP=1 as baseline
-    baseline_time = df[df["NumProcs"] == 1]["TotalTime"].mean()
-    df["Efficiency"] = baseline_time / df["TotalTime"]
+    # Baseline time at NumProcs=1
+    baseline_frames = df_frames[df_frames["NumProcs"] == 1]["TotalTime"].mean()
+    df_frames["Efficiency"] = baseline_frames / df_frames["TotalTime"]
     
-    plt.figure(figsize=(8,6))
-    plt.plot(df["NumProcs"].to_numpy(), df["Efficiency"].to_numpy(), marker='o')
-    plt.xlabel("Number of Processes")
-    plt.ylabel("Weak Scaling Efficiency")
-    plt.title("Weak Scaling Efficiency (Increasing Frames)")
-    plt.grid(True)
-    plt.tight_layout()
-    plt.savefig("graphs/weak_scaling_efficiency_frames.png")
-    plt.close()
+    # Sort by NumProcs just in case
+    df_frames = df_frames.sort_values(by="NumProcs")
+    
+    # Convert Series to numpy arrays
+    x_frames = df_frames["NumProcs"].to_numpy()
+    y_frames = df_frames["Efficiency"].to_numpy()
 
-# ------------------------- Graph: Weak Scaling Efficiency (Increasing Resolution) -------------------------
-def plot_weak_scaling_efficiency_size():
-    """
-    Reads 'data/weak_scaling_size.csv' which has columns:
-    NumProcs, Resolution, TotalTime.
-    Computes weak scaling efficiency as: Efficiency = T(1) / T(N)
-    and plots efficiency vs. number of processes.
-    """
+    ax1.plot(x_frames, y_frames, marker='o')
+    ax1.set_xlabel("Number of Processes")
+    ax1.set_ylabel("Weak Scaling Efficiency")
+    ax1.set_title("MPI Weak Scaling Efficiency (Increasing Frames)")
+    ax1.grid(True)
+    
+    # ------------------ Subplot 2: Weak Scaling (Increasing Resolution) ------------------
     try:
-        df = pd.read_csv("data/weak_scaling_size.csv")
+        df_size = pd.read_csv("data/weak_scaling_size.csv")
     except Exception as e:
-        print("data/weak_scaling_size.csv not found.")
+        print("data/weak_scaling_size.csv not found or invalid.")
         return
     
-    df["NumProcs"] = pd.to_numeric(df["NumProcs"], errors="coerce")
-    df["TotalTime"] = pd.to_numeric(df["TotalTime"], errors="coerce")
+    df_size["NumProcs"]    = pd.to_numeric(df_size["NumProcs"],    errors="coerce")
+    df_size["TotalTime"]   = pd.to_numeric(df_size["TotalTime"],   errors="coerce")
     
-    baseline_time = df[df["NumProcs"] == 1]["TotalTime"].mean()
-    df["Efficiency"] = baseline_time / df["TotalTime"]
+    baseline_size = df_size[df_size["NumProcs"] == 1]["TotalTime"].mean()
+    df_size["Efficiency"] = baseline_size / df_size["TotalTime"]
     
-    plt.figure(figsize=(8,6))
-    plt.plot(df["NumProcs"].to_numpy(), df["Efficiency"].to_numpy(), marker='o')
-    plt.xlabel("Number of Processes")
-    plt.ylabel("Weak Scaling Efficiency")
-    plt.title("Weak Scaling Efficiency (Increasing Resolution)")
-    plt.grid(True)
+    # Sort by NumProcs for consistency
+    df_size = df_size.sort_values(by="NumProcs")
+
+    x_size = df_size["NumProcs"].to_numpy()
+    y_size = df_size["Efficiency"].to_numpy()
+
+    ax2.plot(x_size, y_size, marker='o')
+    ax2.set_xlabel("Number of Processes")
+    ax2.set_ylabel("Weak Scaling Efficiency")
+    ax2.set_title("MPI Weak Scaling Efficiency (Increasing Resolution)")
+    ax2.grid(True)
+    
+    # Final layout and save
     plt.tight_layout()
-    plt.savefig("graphs/weak_scaling_efficiency_size.png")
+    plt.savefig("graphs/weak_scaling_efficiencies_combined.png")
     plt.close()
 
 
+def plot_openmp_weak_scaling_efficiencies():
+    """
+    Creates a 1x2 subplot figure for OpenMP weak scaling efficiency:
+     - Left subplot: Efficiency vs. Threads for increasing frames
+     - Right subplot: Efficiency vs. Threads for increasing resolution
 
-# ------------------------- Graph: OpenMP Weak Scaling Efficiency (Increasing Frames) -------------------------
-def plot_openmp_weak_scaling_efficiency_frames():
+    Reads:
+      data/openmp_weak_scaling_frames.csv -> columns: Threads, NumFrames, TotalTime
+      data/openmp_weak_scaling_size.csv   -> columns: Threads, Resolution, TotalTime
+
+    Efficiency = T(1-thread) / T(n-threads).
     """
-    Reads 'data/openmp_weak_scaling_frames.csv' with columns:
-    Threads, NumFrames, TotalTime.
-    Computes weak scaling efficiency as Efficiency = T(1) / T(n) and plots it versus thread count.
-    """
+
+    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(14, 6))
+
+    # ------------------ Subplot 1: Weak Scaling Efficiency (Increasing Frames) ------------------
     try:
-        df = pd.read_csv("data/openmp_weak_scaling_frames.csv")
+        df_frames = pd.read_csv("data/openmp_weak_scaling_frames.csv")
     except Exception as e:
-        print("data/openmp_weak_scaling_frames.csv not found.")
+        print("data/openmp_weak_scaling_frames.csv not found or invalid.")
         return
 
-    # Convert columns to numeric
-    df["Threads"] = pd.to_numeric(df["Threads"], errors="coerce")
-    df["TotalTime"] = pd.to_numeric(df["TotalTime"], errors="coerce")
-    
-    # Use the runtime at 1 thread as the baseline
-    baseline_time = df[df["Threads"] == 1]["TotalTime"].mean()
-    df["Efficiency"] = baseline_time / df["TotalTime"]
+    df_frames["Threads"]   = pd.to_numeric(df_frames["Threads"],   errors="coerce")
+    df_frames["TotalTime"] = pd.to_numeric(df_frames["TotalTime"], errors="coerce")
 
-    plt.figure(figsize=(8,6))
-    plt.plot(df["Threads"].to_numpy(), df["Efficiency"].to_numpy(), marker='o', color="#1f77b4")
-    plt.xlabel("Number of Threads")
-    plt.ylabel("Weak Scaling Efficiency")
-    plt.title("OpenMP Weak Scaling Efficiency (Increasing Frames)")
-    plt.grid(True)
-    plt.tight_layout()
-    plt.savefig("graphs/openmp_weak_scaling_efficiency_frames.png")
-    plt.close()
+    baseline_frames = df_frames[df_frames["Threads"] == 1]["TotalTime"].mean()
+    df_frames["Efficiency"] = baseline_frames / df_frames["TotalTime"]
+    df_frames = df_frames.sort_values(by="Threads")
 
-# ------------------------- Graph: OpenMP Weak Scaling Efficiency (Increasing Resolution) -------------------------
-def plot_openmp_weak_scaling_efficiency_size():
-    """
-    Reads 'data/openmp_weak_scaling_size.csv' with columns:
-    Threads, Resolution, TotalTime.
-    Computes weak scaling efficiency as Efficiency = T(1) / T(n) and plots it versus thread count.
-    """
+    x_fr = df_frames["Threads"].to_numpy()
+    y_fr = df_frames["Efficiency"].to_numpy()
+
+    ax1.plot(x_fr, y_fr, marker='o', color="#1f77b4")
+    ax1.set_xlabel("Number of Threads")
+    ax1.set_ylabel("Weak Scaling Efficiency")
+    ax1.set_title("OpenMP Weak Scaling (Increasing Frames)")
+    ax1.grid(True)
+
+    # ------------------ Subplot 2: Weak Scaling Efficiency (Increasing Resolution) ------------------
     try:
-        df = pd.read_csv("data/openmp_weak_scaling_size.csv")
+        df_size = pd.read_csv("data/openmp_weak_scaling_size.csv")
     except Exception as e:
-        print("data/openmp_weak_scaling_size.csv not found.")
+        print("data/openmp_weak_scaling_size.csv not found or invalid.")
         return
 
-    df["Threads"] = pd.to_numeric(df["Threads"], errors="coerce")
-    df["TotalTime"] = pd.to_numeric(df["TotalTime"], errors="coerce")
-    
-    baseline_time = df[df["Threads"] == 1]["TotalTime"].mean()
-    df["Efficiency"] = baseline_time / df["TotalTime"]
+    df_size["Threads"]   = pd.to_numeric(df_size["Threads"],   errors="coerce")
+    df_size["TotalTime"] = pd.to_numeric(df_size["TotalTime"], errors="coerce")
 
-    plt.figure(figsize=(8,6))
-    plt.plot(df["Threads"].to_numpy(), df["Efficiency"].to_numpy(), marker='o', color="#ff7f0e")
-    plt.xlabel("Number of Threads")
-    plt.ylabel("Weak Scaling Efficiency")
-    plt.title("OpenMP Weak Scaling Efficiency (Increasing Resolution)")
-    plt.grid(True)
+    baseline_size = df_size[df_size["Threads"] == 1]["TotalTime"].mean()
+    df_size["Efficiency"] = baseline_size / df_size["TotalTime"]
+    df_size = df_size.sort_values(by="Threads")
+
+    x_sz = df_size["Threads"].to_numpy()
+    y_sz = df_size["Efficiency"].to_numpy()
+
+    ax2.plot(x_sz, y_sz, marker='o', color="#ff7f0e")
+    ax2.set_xlabel("Number of Threads")
+    ax2.set_ylabel("Weak Scaling Efficiency")
+    ax2.set_title("OpenMP Weak Scaling (Increasing Resolution)")
+    ax2.grid(True)
+
     plt.tight_layout()
-    plt.savefig("graphs/openmp_weak_scaling_efficiency_size.png")
+    plt.savefig("graphs/openmp_weak_scaling_efficiencies_combined.png")
     plt.close()
-
 
 # ------------------------- Graph 4: CUDA Time Breakdown -------------------------
 def plot_cuda_time_breakdown():
@@ -300,40 +316,56 @@ def plot_mpi_comm_vs_comp():
 # ------------------------- Graph 6: Runtime Comparison per GIF -------------------------
 def plot_runtime_comparison():
     """
-    This function reads the CSV file 'data/compare_all.csv' which contains
-    the runtime results for each GIF image and each implementation:
-    Image,Sequential,OpenMP,MPI+OpenMP,Hybrid,CUDA,MPI Frames,MPI Domain
+    Reads 'data/compare_all.csv' and creates a grouped bar chart comparing 
+    only the Sequential, OpenMP, MPI Domain, and CUDA implementations on a log scale.
 
-    It then creates a grouped bar chart with one group per image.
+    CSV Columns Expected:
+    Image,Sequential,OpenMP,MPI+OpenMP,Hybrid,CUDA,MPI Frames,MPI Domain
     """
+    import pandas as pd
+    import matplotlib.pyplot as plt
+    import numpy as np
+
+    # Attempt to read the CSV file
     try:
         df = pd.read_csv("data/compare_all.csv")
     except Exception as e:
         print("compare_all.csv not found in data folder.")
         return
     
-    # Convert runtime columns to numeric (non-numeric entries become NaN)
-    versions = ["Sequential", "OpenMP", "MPI+OpenMP", "Hybrid", "CUDA", "MPI Frames", "MPI Domain"]
+    # Restrict to the four versions we want to compare
+    versions = ["Sequential", "OpenMP", "MPI Domain", "CUDA"]
+    
+    # Convert relevant columns to numeric
     for ver in versions:
         df[ver] = pd.to_numeric(df[ver], errors="coerce")
     
     images = df["Image"]
     n = len(images)
     ind = np.arange(n)  # x locations for the groups
-    width = 0.12        # width of each bar (adjusted for 7 groups)
 
-    fig, ax = plt.subplots(figsize=(14,6))
+    # Adjust bar width for four bars in each group
+    width = 0.18
+
+    fig, ax = plt.subplots(figsize=(14, 6))
     
-    # Calculate offsets for the grouped bars
-    offsets = np.arange(len(versions)) * width - (len(versions)-1)*width/2
-    colors = ["#1f77b4", "#ff7f0e", "#2ca02c", "#d62728", "#9467bd", "#8c564b", "#e377c2"]
+    # Set up offsets for grouped bars: 4 versions => 4 offsets around the group center
+    offsets = np.arange(len(versions)) * width - (len(versions) - 1) * width / 2
+
+    # Custom colors for the 4 versions
+    colors = ["#1f77b4", "#ff7f0e", "#d62728", "#9467bd"]
     
+    # Plot each version's bars
     for i, ver in enumerate(versions):
         ax.bar(ind + offsets[i], df[ver], width, label=ver, color=colors[i])
-    
+
     ax.set_xlabel("GIF Image Name")
     ax.set_ylabel("Runtime (s)")
-    ax.set_title("Runtime Comparison per GIF across Implementations")
+
+    # Use a log scale on the y-axis so that small values remain visible
+    ax.set_yscale('log')
+
+    ax.set_title("Runtime Comparison per GIF (Log Scale)")
     ax.set_xticks(ind)
     ax.set_xticklabels(images, rotation=45, ha="right")
     ax.legend()
@@ -341,81 +373,85 @@ def plot_runtime_comparison():
     plt.savefig("graphs/runtime_comparison.png")
     plt.close()
 
-# ------------------------- Graph 7: Runtime vs. Number of Frames -------------------------
-def plot_increasing_frames_runtime():
+
+def plot_increasing_data():
     """
-    This function reads the CSV file 'data/increasing_frames.csv' which contains
-    the runtime results for GIFs with increasing frame counts.
-    The CSV should have columns: Image, NumFrames, OpenMP, MPI_Domain, CUDA.
-    It then plots a line graph with NumFrames on the x-axis and runtime (s) on the y-axis.
+    Reads 'data/increasing_frames.csv' and 'data/increasing_size.csv',
+    then creates a 1x2 subplot figure:
+      - Left subplot: Runtime vs. Number of Frames
+      - Right subplot: Runtime vs. Image Width
+    Each subplot shows lines for Sequential, OpenMP, MPI Domain, and CUDA.
     """
+
+    # --- Part 1: Read and plot 'increasing_frames.csv' ---
     try:
-        df = pd.read_csv("data/increasing_frames.csv")
+        frames_df = pd.read_csv("data/increasing_frames.csv")
     except Exception as e:
-        print("data/increasing_frames.csv not found.")
+        print("data/increasing_frames.csv not found or invalid.")
         return
 
-    # Convert NumFrames to numeric
-    df["NumFrames"] = pd.to_numeric(df["NumFrames"], errors="coerce")
+    # Convert columns to numeric
+    frames_df["NumFrames"] = pd.to_numeric(frames_df["NumFrames"], errors="coerce")
+    for col in ["Sequential", "OpenMP", "MPI_Domain", "CUDA"]:
+        frames_df[col] = pd.to_numeric(frames_df[col], errors="coerce")
 
-    # Convert series to numpy arrays to avoid multi-dimensional indexing error
-    num_frames = df["NumFrames"].to_numpy()
-    openmp_time = df["OpenMP"].to_numpy()
-    mpi_domain_time = df["MPI_Domain"].to_numpy()
-    cuda_time = df["CUDA"].to_numpy()
+    # Sort by NumFrames ascending, in case it's out of order
+    frames_df = frames_df.sort_values(by="NumFrames")
 
-    plt.figure(figsize=(10,6))
-    plt.plot(num_frames, openmp_time, marker='o', label="OpenMP")
-    plt.plot(num_frames, mpi_domain_time, marker='o', label="MPI Domain")
-    plt.plot(num_frames, cuda_time, marker='o', label="CUDA")
-    plt.xlabel("Number of Frames")
-    plt.ylabel("Runtime (s)")
-    plt.title("Runtime vs. Number of Frames\n(OpenMP vs MPI Domain vs CUDA)")
-    plt.legend()
-    plt.grid(True)
+    num_frames = frames_df["NumFrames"].to_numpy()
+    seq_time_f = frames_df["Sequential"].to_numpy()
+    omp_time_f = frames_df["OpenMP"].to_numpy()
+    mpi_time_f = frames_df["MPI_Domain"].to_numpy()
+    cuda_time_f = frames_df["CUDA"].to_numpy()
+
+    # --- Part 2: Read and plot 'increasing_size.csv' ---
+    try:
+        size_df = pd.read_csv("data/increasing_size.csv")
+    except Exception as e:
+        print("data/increasing_size.csv not found or invalid.")
+        return
+
+    for col in ["Sequential", "OpenMP", "MPI_Domain", "CUDA"]:
+        size_df[col] = pd.to_numeric(size_df[col], errors="coerce")
+
+    # Extract width from the Resolution column
+    # Format is "WxH" (e.g., "100x100") => split and convert the first part to float
+    size_df["Width"] = size_df["Resolution"].str.split("x", expand=True)[0].astype(float)
+    size_df = size_df.sort_values(by="Width")  # ensure ascending order
+
+    width = size_df["Width"].to_numpy()
+    seq_time_s = size_df["Sequential"].to_numpy()
+    omp_time_s = size_df["OpenMP"].to_numpy()
+    mpi_time_s = size_df["MPI_Domain"].to_numpy()
+    cuda_time_s = size_df["CUDA"].to_numpy()
+
+    # --- Create a 1 x 2 figure with subplots ---
+    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(14, 6))
+
+    # Subplot 1: Runtime vs. Number of Frames
+    ax1.plot(num_frames, seq_time_f, marker='o', label="Sequential")
+    ax1.plot(num_frames, omp_time_f, marker='o', label="OpenMP")
+    ax1.plot(num_frames, mpi_time_f, marker='o', label="MPI Domain")
+    ax1.plot(num_frames, cuda_time_f, marker='o', label="CUDA")
+    ax1.set_xlabel("Number of Frames")
+    ax1.set_ylabel("Runtime (s)")
+    ax1.set_title("Runtime vs. Number of Frames")
+    ax1.legend()
+    ax1.grid(True)
+
+    # Subplot 2: Runtime vs. Image Width
+    ax2.plot(width, seq_time_s, marker='o', label="Sequential")
+    ax2.plot(width, omp_time_s, marker='o', label="OpenMP")
+    ax2.plot(width, mpi_time_s, marker='o', label="MPI Domain")
+    ax2.plot(width, cuda_time_s, marker='o', label="CUDA")
+    ax2.set_xlabel("Image Width (pixels)")
+    ax2.set_ylabel("Runtime (s)")
+    ax2.set_title("Runtime vs. Image Width")
+    ax2.legend()
+    ax2.grid(True)
+
     plt.tight_layout()
-    plt.savefig("graphs/increasing_frames_runtime.png")
-    plt.close()
-
-# ------------------------- Graph 8: Runtime vs. Image Resolution -------------------------
-def plot_increasing_size_runtime():
-    """
-    This function reads the CSV file 'data/increasing_size.csv' which contains
-    the runtime results for GIFs with increasing resolution.
-    The CSV should have columns: Image, Resolution, OpenMP, MPI_Domain, CUDA.
-    The 'Resolution' is assumed to be in the format 'WidthxHeight' (e.g., "100x100").
-    The function extracts the width and plots runtime (s) versus image width.
-    """
-    try:
-        df = pd.read_csv("data/increasing_size.csv")
-    except Exception as e:
-        print("data/increasing_size.csv not found.")
-        return
-
-    # Extract the width from the Resolution column (assumes format "WidthxHeight")
-    try:
-        df["Width"] = df["Resolution"].str.split("x", expand=True)[0].astype(float)
-    except Exception as e:
-        print("Error processing the Resolution column:", e)
-        return
-
-    # Convert series to numpy arrays
-    width = df["Width"].to_numpy()
-    openmp_time = df["OpenMP"].to_numpy()
-    mpi_domain_time = df["MPI_Domain"].to_numpy()
-    cuda_time = df["CUDA"].to_numpy()
-
-    plt.figure(figsize=(10,6))
-    plt.plot(width, openmp_time, marker='o', label="OpenMP")
-    plt.plot(width, mpi_domain_time, marker='o', label="MPI Domain")
-    plt.plot(width, cuda_time, marker='o', label="CUDA")
-    plt.xlabel("Image Width (pixels)")
-    plt.ylabel("Runtime (s)")
-    plt.title("Runtime vs. Image Resolution\n(OpenMP vs MPI Domain vs CUDA)")
-    plt.legend()
-    plt.grid(True)
-    plt.tight_layout()
-    plt.savefig("graphs/increasing_size_runtime.png")
+    plt.savefig("graphs/increasing_data_subplots.png")
     plt.close()
 
     # ------------------------- Main -------------------------
@@ -424,7 +460,11 @@ if __name__ == "__main__":
     #plot_cuda_time_breakdown()
     #plot_mpi_comm_vs_comp()
     plot_runtime_comparison()
-    plot_increasing_frames_runtime()
+    plot_increasing_data()
+    plot_combined_scaling()
+    plot_weak_scaling_efficiencies()
+    plot_openmp_weak_scaling_efficiencies()
+    """plot_increasing_frames_runtime()
     plot_increasing_size_runtime()
     plot_mpi_speedup()
     plot_openmp_speedup()
@@ -433,5 +473,5 @@ if __name__ == "__main__":
     plot_weak_scaling_efficiency_size()
     plot_openmp_weak_scaling_efficiency_frames()
     plot_openmp_weak_scaling_efficiency_size()
-    plot_cuda_time_breakdown()
+    plot_cuda_time_breakdown()"""
     print("Graphs generated and saved in the 'graphs' directory.")

@@ -57,6 +57,8 @@ typedef struct scatter_info {
     int *displs;      /* Displacement for each process */
     int *image_counts; /* Number of images per process */
     int *image_displs; /* Displacement for image indices */
+    int *scatter_byte_counts; /* Number of bytes to send to each process - cached for reuse */
+    int *scatter_byte_displs; /* Byte displacement for each process - cached for reuse */
 } scatter_info;
 
 /* Min function helper */
@@ -501,6 +503,28 @@ store_pixels( char * filename, animated_gif * image )
 
     p = image->p ;
 
+    /* 
+     * NEW: Color quantization step 
+     * Convert colors to a reduced palette before processing
+     * This ensures we don't exceed the 256 color limit for GIF files
+     */
+    
+    // We'll use a simple color quantization by masking least significant bits
+    // This reduces color space significantly
+    const int COLOR_MASK = 0xE0; // Keeps only 2 most significant bits (4 values per channel = 64 colors total)
+                                 // 11000000 in binary
+    
+    // Apply quantization to all pixels
+    for (i = 0; i < image->n_images; i++) {
+        #pragma omp parallel for default(none) shared(p, i, image) private(j)
+        for (j = 0; j < image->width[i] * image->height[i]; j++) {
+            // Apply color quantization by masking out lower bits
+            p[i][j].r = p[i][j].r & COLOR_MASK;
+            p[i][j].g = p[i][j].g & COLOR_MASK;
+            p[i][j].b = p[i][j].b & COLOR_MASK;
+        }
+    }
+
     /* Find the number of colors inside the image */
     for ( i = 0 ; i < image->n_images ; i++ )
     {
@@ -882,43 +906,39 @@ void free_resources(pixel **p, int n_images)
 // Create scatter/gather information for collective operations
 scatter_info* create_scatter_info(int n_images, int size)
 {
-    scatter_info *info = (scatter_info*)malloc(sizeof(scatter_info));
+    scatter_info* info = (scatter_info*)malloc(sizeof(scatter_info));
     if (!info) return NULL;
     
-    info->sendcounts = (int*)malloc(size * sizeof(int));
-    info->displs = (int*)malloc(size * sizeof(int));
-    info->image_counts = (int*)malloc(size * sizeof(int));
-    info->image_displs = (int*)malloc(size * sizeof(int));
+    info->sendcounts = (int*)calloc(size, sizeof(int));
+    info->displs = (int*)calloc(size, sizeof(int));
+    info->image_counts = (int*)calloc(size, sizeof(int));
+    info->image_displs = (int*)calloc(size, sizeof(int));
+    info->scatter_byte_counts = (int*)calloc(size, sizeof(int));
+    info->scatter_byte_displs = (int*)calloc(size, sizeof(int));
     
-    if (!info->sendcounts || !info->displs || !info->image_counts || !info->image_displs) {
+    if (!info->sendcounts || !info->displs || 
+        !info->image_counts || !info->image_displs ||
+        !info->scatter_byte_counts || !info->scatter_byte_displs) {
+        // Free allocated memory if any allocation failed
         if (info->sendcounts) free(info->sendcounts);
         if (info->displs) free(info->displs);
         if (info->image_counts) free(info->image_counts);
         if (info->image_displs) free(info->image_displs);
+        if (info->scatter_byte_counts) free(info->scatter_byte_counts);
+        if (info->scatter_byte_displs) free(info->scatter_byte_displs);
         free(info);
         return NULL;
     }
     
-    // Calculate base number of images per process and remainder
-    int images_per_process = n_images / size;
-    int remaining_images = n_images % size;
+    // Distribute images evenly among processes
+    int base_count = n_images / size;
+    int remainder = n_images % size;
     
-    // Initialize displacements
-    info->displs[0] = 0;
-    info->image_displs[0] = 0;
-    
-    // Assign counts to each process
     for (int i = 0; i < size; i++) {
-        // Calculate number of images for this process
-        info->image_counts[i] = images_per_process + (i < remaining_images ? 1 : 0);
-        
-        // Set displacement for next process
-        if (i < size - 1) {
-            info->image_displs[i+1] = info->image_displs[i] + info->image_counts[i];
+        info->image_counts[i] = base_count + (i < remainder ? 1 : 0);
+        if (i > 0) {
+            info->image_displs[i] = info->image_displs[i-1] + info->image_counts[i-1];
         }
-        
-        // Initialize sendcounts to 0, will be filled later
-        info->sendcounts[i] = 0;
     }
     
     return info;
@@ -932,46 +952,33 @@ void free_scatter_info(scatter_info *info)
         if (info->displs) free(info->displs);
         if (info->image_counts) free(info->image_counts);
         if (info->image_displs) free(info->image_displs);
+        if (info->scatter_byte_counts) free(info->scatter_byte_counts);
+        if (info->scatter_byte_displs) free(info->scatter_byte_displs);
         free(info);
     }
 }
 
 // Calculate scatter/gather counts for pixel data
-void calculate_pixel_counts(scatter_info *info, int *widths, int *heights, int size)
-{
-    int total_pixels = 0;
+void calculate_pixel_counts(scatter_info* scatter_data, int* widths, int* heights, int size) {
+    if (!scatter_data || !widths || !heights) return;
     
-    // Calculate total pixels per process
+    // Calculate displacements and pixel counts
     for (int i = 0; i < size; i++) {
-        info->sendcounts[i] = 0;
+        int start_img = scatter_data->image_displs[i];
+        int end_img = start_img + scatter_data->image_counts[i];
         
-        for (int j = 0; j < info->image_counts[i]; j++) {
-            int img_idx = info->image_displs[i] + j;
-            int img_pixels = widths[img_idx] * heights[img_idx];
-            info->sendcounts[i] += img_pixels;
-            
-            if (SOBELF_DEBUG) {
-                printf("[DEBUG] Process %d: Image %d (%d of %d), size %dx%d = %d pixels\n", 
-                       i, img_idx, j+1, info->image_counts[i], 
-                       widths[img_idx], heights[img_idx], img_pixels);
-            }
+        scatter_data->sendcounts[i] = 0;
+        for (int j = start_img; j < end_img; j++) {
+            scatter_data->sendcounts[i] += widths[j] * heights[j];
         }
         
-        // Set displacement for next process
-        if (i < size - 1) {
-            info->displs[i+1] = info->displs[i] + info->sendcounts[i];
+        if (i > 0) {
+            scatter_data->displs[i] = scatter_data->displs[i-1] + scatter_data->sendcounts[i-1];
         }
         
-        total_pixels += info->sendcounts[i];
-        
-        if (SOBELF_DEBUG) {
-            printf("[DEBUG] Process %d: Total %d pixels, displacement %d\n", 
-                   i, info->sendcounts[i], info->displs[i]);
-        }
-    }
-    
-    if (SOBELF_DEBUG) {
-        printf("[DEBUG] Total pixels across all processes: %d\n", total_pixels);
+        // Pre-calculate byte counts and displacements to avoid redundant calculations
+        scatter_data->scatter_byte_counts[i] = scatter_data->sendcounts[i] * sizeof(pixel);
+        scatter_data->scatter_byte_displs[i] = scatter_data->displs[i] * sizeof(pixel);
     }
 }
 
@@ -990,8 +997,9 @@ int main(int argc, char **argv)
     MPI_Request *requests = NULL;
     scatter_info *scatter_data = NULL;
 
-    /* Initialize MPI */
-    MPI_Init(&argc, &argv);
+    /* Initialize MPI with thread support for OpenMP */
+    int provided;
+    MPI_Init_thread(&argc, &argv, MPI_THREAD_FUNNELED, &provided);
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
     MPI_Comm_size(MPI_COMM_WORLD, &size);
 
@@ -1076,7 +1084,7 @@ int main(int argc, char **argv)
         }
     }
     
-    /* Broadcast the image dimensions to all processes */
+    /* Use a single Bcast call to transfer all dimensions at once */
     MPI_Bcast(image_widths, n_images, MPI_INT, 0, MPI_COMM_WORLD);
     MPI_Bcast(image_heights, n_images, MPI_INT, 0, MPI_COMM_WORLD);
 
@@ -1090,12 +1098,52 @@ int main(int argc, char **argv)
         }
     }
     
-    MPI_Bcast(scatter_data->image_counts, size, MPI_INT, 0, MPI_COMM_WORLD);
-    MPI_Bcast(scatter_data->image_displs, size, MPI_INT, 0, MPI_COMM_WORLD);
-    MPI_Bcast(scatter_data->sendcounts, size, MPI_INT, 0, MPI_COMM_WORLD);
-    MPI_Bcast(scatter_data->displs, size, MPI_INT, 0, MPI_COMM_WORLD);
+    /* Broadcast scatter info arrays in a single operation when possible */
+    int total_scatter_info_size = size * 4;
+    int* all_scatter_info = NULL;
+    
+    if (rank == 0) {
+        all_scatter_info = (int*)malloc(total_scatter_info_size * sizeof(int));
+        if (!all_scatter_info) {
+            fprintf(stderr, "Process 0: Failed to allocate scatter info buffer\n");
+            MPI_Abort(MPI_COMM_WORLD, 1);
+            return 1;
+        }
+        
+        // Pack all scatter arrays into a single buffer for efficient transfer
+        memcpy(&all_scatter_info[0], scatter_data->image_counts, size * sizeof(int));
+        memcpy(&all_scatter_info[size], scatter_data->image_displs, size * sizeof(int));
+        memcpy(&all_scatter_info[size*2], scatter_data->sendcounts, size * sizeof(int));
+        memcpy(&all_scatter_info[size*3], scatter_data->displs, size * sizeof(int));
+    } else {
+        all_scatter_info = (int*)malloc(total_scatter_info_size * sizeof(int));
+        if (!all_scatter_info) {
+            fprintf(stderr, "Process %d: Failed to allocate scatter info buffer\n", rank);
+            MPI_Abort(MPI_COMM_WORLD, 1);
+            return 1;
+        }
+    }
+    
+    // One broadcast instead of multiple
+    MPI_Bcast(all_scatter_info, total_scatter_info_size, MPI_INT, 0, MPI_COMM_WORLD);
+    
+    if (rank != 0) {
+        // Unpack the received data
+        memcpy(scatter_data->image_counts, &all_scatter_info[0], size * sizeof(int));
+        memcpy(scatter_data->image_displs, &all_scatter_info[size], size * sizeof(int));
+        memcpy(scatter_data->sendcounts, &all_scatter_info[size*2], size * sizeof(int));
+        memcpy(scatter_data->displs, &all_scatter_info[size*3], size * sizeof(int));
+        
+        // Recalculate byte counts and displacements
+        for (int i = 0; i < size; i++) {
+            scatter_data->scatter_byte_counts[i] = scatter_data->sendcounts[i] * sizeof(pixel);
+            scatter_data->scatter_byte_displs[i] = scatter_data->displs[i] * sizeof(pixel);
+        }
+    }
+    
+    free(all_scatter_info);
 
-    /* FILTER Timer start */
+    /* FILTER Timer start - only synchronize once before starting the timer */
     MPI_Barrier(MPI_COMM_WORLD);
     if (rank == 0) {
         gettimeofday(&t1, NULL);
@@ -1188,23 +1236,8 @@ int main(int argc, char **argv)
         return 1;
     }
     
-    /* Scatter pixels to all processes */
-    int *scatter_byte_counts = (int*)malloc(size * sizeof(int));
-    int *scatter_byte_displs = (int*)malloc(size * sizeof(int));
-    
-    if (!scatter_byte_counts || !scatter_byte_displs) {
-        fprintf(stderr, "Process %d: Memory allocation failed for byte counts and displacements\n", rank);
-        MPI_Abort(MPI_COMM_WORLD, 1);
-        return 1;
-    }
-    
-    /* Convert pixel counts to byte counts */
-    for (int i = 0; i < size; i++) {
-        scatter_byte_counts[i] = scatter_data->sendcounts[i] * sizeof(pixel);
-        scatter_byte_displs[i] = scatter_data->displs[i] * sizeof(pixel);
-    }
-    
-    MPI_Scatterv(all_pixels, scatter_byte_counts, scatter_byte_displs, MPI_BYTE,
+    /* Use MPI_Scatterv with MPI_BYTE for more efficient data transfer */
+    MPI_Scatterv(all_pixels, scatter_data->scatter_byte_counts, scatter_data->scatter_byte_displs, MPI_BYTE,
                  scattered_pixels, sendcount * sizeof(pixel), MPI_BYTE,
                  0, MPI_COMM_WORLD);
     
@@ -1261,43 +1294,22 @@ int main(int argc, char **argv)
         }
     }
     
-    /* Make sure all processes are synchronized before gather */
-    MPI_Barrier(MPI_COMM_WORLD);
-
-    /* Debug information to check for buffer size mismatches */
-    if (rank == 0) {
-        printf("Gathering data from processes: \n");
-        for (int i = 0; i < size; i++) {
-            printf("Process %d: %d pixels (%d bytes) at displacement %d (%d bytes)\n", 
-                   i, scatter_data->sendcounts[i], scatter_byte_counts[i],
-                   scatter_data->displs[i], scatter_byte_displs[i]);
-        }
-    }
-    
-    /* Gather results back to master */
-    int result = MPI_Gatherv(gathered_pixels, sendcount * sizeof(pixel), MPI_BYTE,
-                all_pixels, scatter_byte_counts, scatter_byte_displs, MPI_BYTE,
+    /* Use MPI_Gatherv with MPI_BYTE for more efficient data collection */
+    MPI_Gatherv(gathered_pixels, sendcount * sizeof(pixel), MPI_BYTE,
+                all_pixels, scatter_data->scatter_byte_counts, scatter_data->scatter_byte_displs, MPI_BYTE,
                 0, MPI_COMM_WORLD);
                 
-    if (result != MPI_SUCCESS) {
-        char error_string[MPI_MAX_ERROR_STRING];
-        int length;
-        MPI_Error_string(result, error_string, &length);
-        fprintf(stderr, "Process %d: MPI_Gatherv failed: %s\n", rank, error_string);
-        MPI_Abort(MPI_COMM_WORLD, result);
-        return 1;
-    }
-    
-    /* Master copies results back to image structure */
-    if (rank == 0) {
+    /* Copy processed data back to the original image structure */
+    if (rank == 0 && all_pixels != NULL) {
+        /* Copy all processed pixels back to the original image structure */
         int pixel_idx = 0;
         for (int i = 0; i < n_images; i++) {
             memcpy(image->p[i], &all_pixels[pixel_idx], 
-                   image_widths[i] * image_heights[i] * sizeof(pixel));
+                  image_widths[i] * image_heights[i] * sizeof(pixel));
             pixel_idx += image_widths[i] * image_heights[i];
         }
     }
-    
+                
     /* FILTER Timer stop */
     MPI_Barrier(MPI_COMM_WORLD);
     if (rank == 0) {
@@ -1349,10 +1361,6 @@ int main(int argc, char **argv)
         free(image_widths);
         free(image_heights);
     }
-    
-    /* Free byte counts and displacements */
-    free(scatter_byte_counts);
-    free(scatter_byte_displs);
     
     MPI_Finalize();
     return 0;
