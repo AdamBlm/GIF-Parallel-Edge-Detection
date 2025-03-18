@@ -1,8 +1,4 @@
-/*
- * INF560
- *
- * Image Filtering Project - Hybrid MPI + CUDA Implementation
- */
+/* Hybrid MPI + CUDA Implementation */
 #include "cuda_mpi_filter.h"
 #include <stdio.h>
 #include <stdlib.h>
@@ -16,17 +12,15 @@
 #include "gif_lib.h"
 #include "gif_io.h"
 
-/* Set this macro to 1 to enable debugging information */
+
 #define SOBELF_DEBUG 0
 
-/* Define MPI tags for messaging */
+
 #define MPI_TAG_IMAGE_DATA 100
 #define MPI_TAG_IMAGE_DIMS 101
 #define MPI_TAG_RESULT 102
 
 
-
-/* Struct to send image data between processes */
 typedef struct image_data {
     int width;
     int height;
@@ -34,9 +28,6 @@ typedef struct image_data {
     int total_size;
 } image_data;
 
-
-
-/* Main CUDA processing function for a single image */
 static void process_image_cuda(pixel *h_pixels, int width, int height)
 {
     if (h_pixels == NULL || width <= 0 || height <= 0) {
@@ -44,15 +35,15 @@ static void process_image_cuda(pixel *h_pixels, int width, int height)
         return;
     }
 
-    // Calculate buffer sizes
+   
     size_t pixelsSize = width * height * sizeof(pixel);
     
-    // Allocate device memory with error checking
+
     pixel *d_pixels = NULL, *d_temp = NULL;
     int *d_continue = NULL;
     cudaError_t cuda_err;
     
-    // Allocate device memory with proper error checking
+   
     cuda_err = cudaMalloc((void**)&d_pixels, pixelsSize);
     if (cuda_err != cudaSuccess) {
         fprintf(stderr, "CUDA error in cudaMalloc d_pixels: %s\n", 
@@ -88,12 +79,12 @@ static void process_image_cuda(pixel *h_pixels, int width, int height)
         return;
     }
     
-    // Setup execution parameters
+   
     dim3 blockSize(TILE_WIDTH, TILE_HEIGHT);
     dim3 gridSize((width + blockSize.x - 1) / blockSize.x, 
                  (height + blockSize.y - 1) / blockSize.y);
     
-    // Verify block size is valid
+   
     cudaDeviceProp deviceProp;
     cudaGetDeviceProperties(&deviceProp, 0);
     if (blockSize.x * blockSize.y > deviceProp.maxThreadsPerBlock) {
@@ -104,7 +95,7 @@ static void process_image_cuda(pixel *h_pixels, int width, int height)
         gridSize.y = (height + blockSize.y - 1) / blockSize.y;
     }
     
-    // Apply grayscale filter
+   
     grayscale_kernel<<<gridSize, blockSize>>>(d_pixels, width, height);
     cuda_err = cudaDeviceSynchronize();
     if (cuda_err != cudaSuccess) {
@@ -116,7 +107,7 @@ static void process_image_cuda(pixel *h_pixels, int width, int height)
         return;
     }
     
-    // Apply blur filter with convergence
+   
     const int blurSize = 3;  // Same as in the OpenMP version
     const int threshold = 0; // Same as in the OpenMP version
     
@@ -214,7 +205,7 @@ static void process_image_cuda(pixel *h_pixels, int width, int height)
         d_temp = temp;
     }
     
-    // Apply Sobel filter
+  
     size_t sharedMemSizeSobel = (blockSize.x + 2) * (blockSize.y + 2) * sizeof(pixel);
     sobel_kernel<<<gridSize, blockSize, sharedMemSizeSobel>>>(d_pixels, d_temp, width, height);
     cuda_err = cudaGetLastError();
@@ -262,9 +253,6 @@ int run_cuda_mpi_filter(char *input_filename, char *output_filename) {
     MPI_Comm_size(MPI_COMM_WORLD, &size);
 
   
-
-    
-    /* Initialize CUDA and get GPU count */
     cudaError_t cuda_err = cudaGetDeviceCount(&gpu_count);
     if (cuda_err != cudaSuccess) {
         if (rank == 0) {
@@ -278,14 +266,14 @@ int run_cuda_mpi_filter(char *input_filename, char *output_filename) {
         printf("Using %d MPI processes with %d CUDA-capable GPU(s)\n", size, gpu_count);
     }
     
-    /* Set GPU device for this MPI process */
+  
     if (gpu_count > 0) {
         int gpu_id = rank % gpu_count;
         
-        // Reset device before using it
+     
         cudaDeviceReset();
         
-        // Set device with error checking
+    
         cuda_err = cudaSetDevice(gpu_id);
         if (cuda_err != cudaSuccess) {
             fprintf(stderr, "Process %d: Error setting GPU device %d: %s\n", 
@@ -293,13 +281,12 @@ int run_cuda_mpi_filter(char *input_filename, char *output_filename) {
             MPI_Abort(MPI_COMM_WORLD, 1);
             return 1;
         }
-        
-        // Set up exclusive process mode for better multi-process support
+       
         cudaSetDeviceFlags(cudaDeviceScheduleYield);
         
         printf("Process %d using GPU %d\n", rank, gpu_id);
         
-        // Verify device is working by trying a simple operation
+     
         int *d_test = NULL;
         cuda_err = cudaMalloc((void**)&d_test, sizeof(int));
         if (cuda_err != cudaSuccess) {
@@ -318,27 +305,26 @@ int run_cuda_mpi_filter(char *input_filename, char *output_filename) {
         }
     }
 
-    // Make sure all processes have initialized their GPU before proceeding
+  
     MPI_Barrier(MPI_COMM_WORLD);
 
     int n_images = 0;
     int *image_widths = NULL;
     int *image_heights = NULL;
-    
-    /* Process 0 (master) loads the image and distributes work */
+  
     if (rank == 0)
     {
-        /* IMPORT Timer start */
+       
         gettimeofday(&t1, NULL);
 
-        /* Load file and store the pixels in array */
+      
         image = load_pixels(input_filename);
         if (image == NULL) { 
             MPI_Abort(MPI_COMM_WORLD, 1);
             return 1; 
         }
 
-        /* IMPORT Timer stop */
+      
         gettimeofday(&t2, NULL);
         duration = (t2.tv_sec - t1.tv_sec) + ((t2.tv_usec - t1.tv_usec) / 1e6);
         printf("GIF loaded from file %s with %d image(s) in %lf s\n", 
@@ -443,10 +429,10 @@ int run_cuda_mpi_filter(char *input_filename, char *output_filename) {
     
     free(all_scatter_info);
     
-    /* Sync before starting timing */
+
     MPI_Barrier(MPI_COMM_WORLD);
     
-    /* FILTER Timer start */
+
     if (rank == 0) {
         gettimeofday(&t1, NULL);
     }
@@ -455,7 +441,7 @@ int run_cuda_mpi_filter(char *input_filename, char *output_filename) {
     int my_n_images = scatter_data->image_counts[rank];
     int my_start_image = scatter_data->image_displs[rank];
     
-    /* Allocate memory for local image processing */
+  
     pixel **my_pixels = NULL;
     int *my_widths = NULL;
     int *my_heights = NULL;
@@ -527,12 +513,12 @@ int run_cuda_mpi_filter(char *input_filename, char *output_filename) {
         return 1;
     }
     
-    /* Use optimized MPI_Scatterv with pre-calculated byte counts */
+  
     MPI_Scatterv(all_pixels, scatter_data->scatter_byte_counts, scatter_data->scatter_byte_displs, MPI_BYTE,
                  scattered_pixels, sendcount * sizeof(pixel), MPI_BYTE,
                  0, MPI_COMM_WORLD);
     
-    /* Copy scattered pixels to individual image buffers */
+
     if (my_n_images > 0) {
         int pixel_offset = 0;
         for (int i = 0; i < my_n_images; i++) {
@@ -543,17 +529,17 @@ int run_cuda_mpi_filter(char *input_filename, char *output_filename) {
         }
     }
     
-    /* Free temporary scattered buffer */
+   
     if (scattered_pixels) free(scattered_pixels);
     
-    /* Apply the filters to the local images using CUDA */
+  
     if (my_n_images > 0) {
         for (int i = 0; i < my_n_images; i++) {
             process_image_cuda(my_pixels[i], my_widths[i], my_heights[i]);
         }
     }
     
-    /* Prepare buffer for gathering results */
+  
     pixel *gathered_pixels = NULL;
     if (sendcount > 0) {
         gathered_pixels = (pixel*)malloc(sendcount * sizeof(pixel));
@@ -563,7 +549,7 @@ int run_cuda_mpi_filter(char *input_filename, char *output_filename) {
             return 1;
         }
         
-        /* Copy processed pixels to contiguous buffer */
+       
         int pixel_offset = 0;
         for (int i = 0; i < my_n_images; i++) {
             int pixel_count = my_widths[i] * my_heights[i];
@@ -573,10 +559,10 @@ int run_cuda_mpi_filter(char *input_filename, char *output_filename) {
         }
     }
     
-    /* Make sure all processes are synchronized before gather */
+  
     MPI_Barrier(MPI_COMM_WORLD);
 
-    /* Debug information to check for buffer size mismatches */
+  
     if (rank == 0 && SOBELF_DEBUG) {
         printf("Gathering data from processes: \n");
         for (int i = 0; i < size; i++) {
@@ -586,7 +572,7 @@ int run_cuda_mpi_filter(char *input_filename, char *output_filename) {
         }
     }
     
-    /* Use optimized MPI_Gatherv with pre-calculated byte counts */
+   
     MPI_Gatherv(gathered_pixels, sendcount * sizeof(pixel), MPI_BYTE,
                 all_pixels, scatter_data->scatter_byte_counts, scatter_data->scatter_byte_displs, MPI_BYTE,
                 0, MPI_COMM_WORLD);
@@ -601,7 +587,7 @@ int run_cuda_mpi_filter(char *input_filename, char *output_filename) {
         }
     }
     
-    /* FILTER Timer stop */
+  
     MPI_Barrier(MPI_COMM_WORLD);
     if (rank == 0) {
         gettimeofday(&t2, NULL);
@@ -611,7 +597,7 @@ int run_cuda_mpi_filter(char *input_filename, char *output_filename) {
         /* EXPORT Timer start */
         gettimeofday(&t1, NULL);
 
-        /* Store file from array of pixels to GIF file */
+       
         if (!store_pixels(output_filename, image)) { 
             free_resources(image->p, image->n_images);
             free(image->width);
@@ -621,13 +607,13 @@ int run_cuda_mpi_filter(char *input_filename, char *output_filename) {
             return 1; 
         }
 
-        /* EXPORT Timer stop */
+      
         gettimeofday(&t2, NULL);
         duration = (t2.tv_sec - t1.tv_sec) + ((t2.tv_usec - t1.tv_usec) / 1e6);
         printf("Export done in %lf s in file %s\n", duration, output_filename);
     }
     
-    /* Free resources */
+
     if (my_n_images > 0) {
         free_resources(my_pixels, my_n_images);
         free(my_widths);

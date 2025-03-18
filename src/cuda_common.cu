@@ -3,7 +3,6 @@
 #include <stdlib.h>
 #include <string.h>
 
-// --- CUDA Kernel definitions ---
 
 __global__ void grayscale_kernel(pixel *d_pixels, int width, int height) {
     int x = blockIdx.x * blockDim.x + threadIdx.x;
@@ -118,7 +117,7 @@ __global__ void sobel_kernel(pixel *d_in, pixel *d_out, int width, int height) {
     }
 }
 
-// --- Scatter/Gather helper definitions ---
+
 scatter_info* create_scatter_info(int n_images, int size) {
     scatter_info* info = (scatter_info*)malloc(sizeof(scatter_info));
     if (!info) return NULL;
@@ -177,7 +176,7 @@ void calculate_pixel_counts(scatter_info* scatter_data, int* widths, int* height
     }
 }
 
-// --- Resource cleanup helper ---
+
 void free_resources(pixel **p, int n_images) {
     if (p) {
         for (int i = 0; i < n_images; i++) {

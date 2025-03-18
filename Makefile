@@ -1,14 +1,14 @@
-# Directories
+
 SRC_DIR = src
 HEADER_DIR = include
 OBJ_DIR = obj
 
-# Compilers
+
 CC = gcc
 MPICC = mpicc
 NVCC = nvcc
 
-# Flags
+
 CFLAGS    = -O3 -I$(HEADER_DIR) -fopenmp
 LDFLAGS   = -lm -fopenmp
 
@@ -18,7 +18,7 @@ MPI_LDFLAGS   = -lm -fopenmp
 CUDA_CFLAGS = -O3 -I$(HEADER_DIR) -diag-suppress=541
 CUDA_LDFLAGS = -lm
 
-# Adaptive filter sources and objects
+
 ADAPT_SRC = adaptive_filter.c \
             sequential_filter.c \
             mpi_domain_filter.c \
@@ -44,19 +44,19 @@ ADAPT_OBJ = $(addprefix $(OBJ_DIR)/, \
             hybrid_openmp_mpi_filter.o dgif_lib.o cuda_common.o egif_lib.o \
             gif_err.o gif_font.o gif_hash.o gifalloc.o openbsd-reallocarray.o quantize.o)
 
-# Adaptive filter target
+
 adaptive_filter: $(ADAPT_OBJ)
 	$(MPICC) $(MPI_CFLAGS) -o $@ $^ $(MPI_LDFLAGS) -L$(CUDA_ROOT)/lib64 -lcudart -lstdc++
 
-# Create the object directory if it doesn't exist
+
 $(OBJ_DIR):
 	mkdir -p $(OBJ_DIR)
 
-# Generic rule for compiling C files
+
 $(OBJ_DIR)/%.o: $(SRC_DIR)/%.c | $(OBJ_DIR)
 	$(CC) $(CFLAGS) -c -o $@ $<
 
-# Generic rule for compiling CUDA files (*.cu)
+
 $(OBJ_DIR)/%.o: $(SRC_DIR)/%.cu | $(OBJ_DIR)
 	$(NVCC) $(CUDA_CFLAGS) -c -o $@ $< -Xcompiler "-fexceptions"
 

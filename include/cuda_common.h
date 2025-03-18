@@ -13,7 +13,7 @@ extern "C" {
 #define TILE_HEIGHT 16
 #define CONV(l, c, nb_c) ((l) * (nb_c) + (c))
 
-// CUDA error checking macro
+
 #define CUDA_CHECK(call) \
 do { \
     cudaError_t err = call; \

@@ -1,4 +1,4 @@
-# Adaptive Image Filtering Project
+# Adaptive Image Filtering
 
 Here we automatically (or via a user override) detects hardware resources (MPI ranks, OpenMP threads, CUDA GPUs) and input image characteristics, then selects the best parallelization approach for filtering the images based on our previous benchmarking results. The available processing modes include:
 

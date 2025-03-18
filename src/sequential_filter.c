@@ -6,7 +6,7 @@
 #include "gif_lib.h"
 #include "gif_io.h"
 
-/* Set this macro to 1 to enable debugging information */
+
 #define SOBELF_DEBUG 0
 
 
@@ -14,7 +14,6 @@
     (l)*(nb_c)+(c)
 
 
-/* Converts each pixel in the image to grayscale */
 static void apply_gray_filter(animated_gif * image) {
     int i, j, k;
     pixel ** p = image->p;
@@ -328,13 +327,6 @@ void apply_gray_line(animated_gif * image)
 }
 
 
-/* (Other filtering functions such as apply_blur_filter and apply_sobel_filter would be defined similarly.) */
-
-/* --- Adaptive Driver: Sequential Filtering --- */
-
-/* This function runs the sequential filtering pipeline.
- * It returns 0 on success, nonzero on failure.
- */
 int run_sequential_filter(char *input_filename, char *output_filename) {
     animated_gif * image;
     struct timeval t1, t2;

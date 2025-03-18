@@ -11,9 +11,7 @@
 #include "gif_lib.h"
 #include "gif_io.h"
 
-/* --------------------------------------------------------------------
-   Macros and MPI tags
---------------------------------------------------------------------- */
+
 #ifndef SOBELF_DEBUG
 #define SOBELF_DEBUG 1
 #endif
@@ -22,13 +20,12 @@
 #define MPI_TAG_IMAGE_DIMS 101
 #define MPI_TAG_RESULT 102
 
-/* Minimum image size for GPU processing */
 #define MIN_SIZE_FOR_GPU (128*128)
 #define MAX_STREAMS_PER_GPU 4
 
 
 
-/* Struct to send image data between processes */
+
 typedef struct image_data {
     int width;
     int height;
@@ -38,20 +35,20 @@ typedef struct image_data {
 
 
 
-/* CUDA resources for each GPU */
+
 typedef struct cuda_resources {
-    int device_id;           /* CUDA device ID */
-    cudaStream_t streams[MAX_STREAMS_PER_GPU]; /* CUDA streams for async execution */
-    pixel *d_pixels;         /* Device buffer for pixels */
-    pixel *d_temp;           /* Device temporary buffer */
-    int *d_continue;         /* Device flag for convergence */
-    size_t allocated_size;   /* Size of allocated device memory */
+    int device_id;          
+    cudaStream_t streams[MAX_STREAMS_PER_GPU]; 
+    pixel *d_pixels;      
+    pixel *d_temp;          
+    int *d_continue;        
+    size_t allocated_size;   
 } cuda_resources;
 
-/* Min/Max function helpers - removed since we'll use CUDA built-ins */
+
 #ifndef MIN_MAX_FUNC
 #define MIN_MAX_FUNC
-// Only use these in host code - for device code, use CUDA's built-in min and max
+
 static inline int min_int(int a, int b) {
     return (a < b) ? a : b;
 }
@@ -61,13 +58,6 @@ static inline int max_int(int a, int b) {
 }
 #endif
 
-/*
- * Forward declarations for GIF-related functions (implemented elsewhere)
- */
-// These forward declarations are no longer needed as we include gif_utils.h
-// animated_gif *load_pixels(char *filename);
-// int output_modified_read_gif(char *filename, GifFileType *g);
-// int store_pixels(char *filename, animated_gif *image);
 
 // Added forward declaration for optimized store_pixels with color quantization
 int store_pixels_optimized(char *filename, animated_gif *image);
@@ -324,7 +314,7 @@ store_pixels_optimized( char * filename, animated_gif * image )
         }
     }
 
-    /* Find the number of colors inside the image */
+ 
     for ( i = 0 ; i < image->n_images ; i++ )
     {
 
@@ -539,7 +529,7 @@ void apply_blur_filter_cpu(pixel *p, int width, int height, int size, int thresh
 #endif
 }
 
-/* Apply sobel filter to an image on CPU */
+
 void apply_sobel_filter_cpu(pixel *p, int width, int height, pixel *buffer)
 {
     // First, copy the original image to buffer to preserve it
@@ -601,12 +591,12 @@ void apply_sobel_filter_cpu(pixel *p, int width, int height, pixel *buffer)
                               
             float val_blue = sqrt(deltaX_blue * deltaX_blue + deltaY_blue * deltaY_blue)/4;
 
-            // Find maximum gradient value across all channels
+           
             float max_val = val_red;
             if (val_green > max_val) max_val = val_green;
             if (val_blue > max_val) max_val = val_blue;
 
-            // Apply binary thresholding
+           
             int idx = row_curr + k;
             if (max_val > 15) {
                 buffer[idx].r = 255;
@@ -620,7 +610,7 @@ void apply_sobel_filter_cpu(pixel *p, int width, int height, pixel *buffer)
         }
     }
     
-    // Copy result back to original image
+   
     #pragma omp parallel for default(none) shared(p, buffer, width, height) schedule(static)
     for (int j = 0; j < height; j++)
     {
@@ -645,12 +635,12 @@ void process_image_cpu(pixel *pixels, int width, int height)
         exit(EXIT_FAILURE);
     }
     
-    // Apply filters in sequence
+  
     apply_gray_filter_cpu(pixels, width, height);
     apply_blur_filter_cpu(pixels, width, height, 3, 0, buffer);
     apply_sobel_filter_cpu(pixels, width, height, buffer);
     
-    // Free buffer
+  
     free(buffer);
 }
 
@@ -661,14 +651,14 @@ cuda_resources* init_cuda_resources(int device_id)
     cuda_resources *res = (cuda_resources*)malloc(sizeof(cuda_resources));
     if (!res) return NULL;
     
-    // Initialize fields
+   
     res->device_id = device_id;
     res->d_pixels = NULL;
     res->d_temp = NULL;
     res->d_continue = NULL;
     res->allocated_size = 0;
     
-    // Set device
+ 
     CUDA_CHECK(cudaSetDevice(device_id));
     
     // Create streams
@@ -727,18 +717,18 @@ void ensure_device_memory(cuda_resources *res, size_t required_size)
     }
 }
 
-/* Free CUDA resources */
+
 void free_cuda_resources(cuda_resources *res)
 {
     if (res) {
         CUDA_CHECK(cudaSetDevice(res->device_id));
         
-        // Destroy streams
+       
         for (int i = 0; i < MAX_STREAMS_PER_GPU; i++) {
             CUDA_CHECK(cudaStreamDestroy(res->streams[i]));
         }
         
-        // Free memory
+       
         if (res->d_pixels) CUDA_CHECK(cudaFree(res->d_pixels));
         if (res->d_temp) CUDA_CHECK(cudaFree(res->d_temp));
         if (res->d_continue) CUDA_CHECK(cudaFree(res->d_continue));
@@ -747,19 +737,19 @@ void free_cuda_resources(cuda_resources *res)
     }
 }
 
-/* Process an image using CUDA with a specific stream */
+
 void process_image_cuda(pixel *h_pixels, int width, int height, cuda_resources *res, int stream_idx)
 {
-    // Validate inputs
+
     if (!h_pixels || width <= 0 || height <= 0 || !res) {
         fprintf(stderr, "Error: Invalid parameters to process_image_cuda\n");
         throw std::runtime_error("Invalid parameters to process_image_cuda");
     }
     
-    // Calculate buffer size
+ 
     size_t pixelsSize = width * height * sizeof(pixel);
     
-    // Set device
+
     cudaError_t err = cudaSetDevice(res->device_id);
     if (err != cudaSuccess) {
         fprintf(stderr, "CUDA error setting device: %s\n", cudaGetErrorString(err));
@@ -767,10 +757,9 @@ void process_image_cuda(pixel *h_pixels, int width, int height, cuda_resources *
     }
     
 
-    // Get the stream to use
     cudaStream_t stream = res->streams[stream_idx % MAX_STREAMS_PER_GPU];
     
-    // Copy input data to device
+
     err = cudaMemcpyAsync(res->d_pixels, h_pixels, pixelsSize, 
                       cudaMemcpyHostToDevice, stream);
     if (err != cudaSuccess) {
@@ -778,12 +767,12 @@ void process_image_cuda(pixel *h_pixels, int width, int height, cuda_resources *
         throw std::runtime_error("CUDA memory copy error");
     }
     
-    // Setup execution parameters
+ 
     dim3 blockSize(TILE_WIDTH, TILE_HEIGHT);
     dim3 gridSize((width + blockSize.x - 1) / blockSize.x, 
                  (height + blockSize.y - 1) / blockSize.y);
     
-    // Apply grayscale filter
+  
     grayscale_kernel<<<gridSize, blockSize, 0, stream>>>(res->d_pixels, width, height);
     err = cudaGetLastError();
     if (err != cudaSuccess) {
@@ -791,44 +780,44 @@ void process_image_cuda(pixel *h_pixels, int width, int height, cuda_resources *
         throw std::runtime_error("CUDA kernel error");
     }
     
-    // Apply blur filter with convergence
-    const int blurSize = 3;  // Same as in the CPU version
-    const int threshold = 0; // Same as in the CPU version
+  
+    const int blurSize = 3;  
+    const int threshold = 0; 
     
-    // Calculate shared memory size for blur kernel
+ 
     size_t sharedMemSizeBlur = (blockSize.x + 2 * blurSize) * 
                               (blockSize.y + 2 * blurSize) * 
                               sizeof(pixel);
     
     if (threshold > 0) {
         int h_continue;
-        int max_iterations = 50;  // Limit iterations to avoid infinite loop
+        int max_iterations = 50; 
         int iter = 0;
         
         do {
-            // Initialize continue flag
+          
             h_continue = 0;
             CUDA_CHECK(cudaMemcpyAsync(res->d_continue, &h_continue, sizeof(int), 
                                     cudaMemcpyHostToDevice, stream));
             
-            // Apply blur
+          
             blur_kernel<<<gridSize, blockSize, sharedMemSizeBlur, stream>>>(
                 res->d_pixels, res->d_temp, width, height, blurSize);
             
-            // Check for convergence
+          
             check_convergence_kernel<<<gridSize, blockSize, 0, stream>>>(
                 res->d_pixels, res->d_temp, width, height, threshold, res->d_continue);
             
-            // Swap buffers
+       
             pixel *temp = res->d_pixels;
             res->d_pixels = res->d_temp;
             res->d_temp = temp;
             
-            // Get continue flag
+           
             CUDA_CHECK(cudaMemcpyAsync(&h_continue, res->d_continue, sizeof(int), 
                                     cudaMemcpyDeviceToHost, stream));
             
-            // Need to synchronize to check the flag
+          
             CUDA_CHECK(cudaStreamSynchronize(stream));
             
             iter++;
@@ -838,26 +827,24 @@ void process_image_cuda(pixel *h_pixels, int width, int height, cuda_resources *
         printf("BLUR GPU: number of iterations: %d\n", iter);
 #endif
     } else {
-        // Just apply blur once
+       
         blur_kernel<<<gridSize, blockSize, sharedMemSizeBlur, stream>>>(
             res->d_pixels, res->d_temp, width, height, blurSize);
-        
-        // Swap buffers
+     
         pixel *temp = res->d_pixels;
         res->d_pixels = res->d_temp;
         res->d_temp = temp;
     }
     
-    // Apply Sobel filter
+ 
     size_t sharedMemSizeSobel = (blockSize.x + 2) * (blockSize.y + 2) * sizeof(pixel);
     sobel_kernel<<<gridSize, blockSize, sharedMemSizeSobel, stream>>>(
         res->d_pixels, res->d_temp, width, height);
     
-    // Copy results back to host
+    
     CUDA_CHECK(cudaMemcpyAsync(h_pixels, res->d_temp, pixelsSize, 
                             cudaMemcpyDeviceToHost, stream));
     
-    // Synchronize to ensure the transfer is complete
     CUDA_CHECK(cudaStreamSynchronize(stream));
 }
 
@@ -874,7 +861,7 @@ int run_cuda_omp_mpi_filter(char *input_filename, char *output_filename, int omp
     int gpu_count = 0;
     
 
-    /* Initialize MPI with thread support for OpenMP and CUDA */
+
     int provided;
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
     MPI_Comm_size(MPI_COMM_WORLD, &size);
@@ -972,14 +959,14 @@ int run_cuda_omp_mpi_filter(char *input_filename, char *output_filename, int omp
         /* IMPORT Timer start */
         gettimeofday(&t1, NULL);
 
-        /* Load file and store the pixels in array */
+
         image = load_pixels(input_filename);
         if (image == NULL) { 
             MPI_Abort(MPI_COMM_WORLD, 1);
             return 1; 
         }
 
-        /* IMPORT Timer stop */
+     
         gettimeofday(&t2, NULL);
         duration = (t2.tv_sec - t1.tv_sec) + ((t2.tv_usec - t1.tv_usec) / 1e6);
         printf("GIF loaded from file %s with %d image(s) in %lf s\n", 
@@ -1001,7 +988,7 @@ int run_cuda_omp_mpi_filter(char *input_filename, char *output_filename, int omp
         
         printf("DEBUG[0]: Calculating pixel counts\n");
         
-        // Calculate pixel counts for each process
+       
         calculate_pixel_counts(scatter_data, image_widths, image_heights, size);
         
         printf("DEBUG[0]: Scatter info ready\n");

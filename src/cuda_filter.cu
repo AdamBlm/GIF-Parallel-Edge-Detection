@@ -11,8 +11,7 @@
 #define SOBELF_DEBUG 0
 #endif
 
-// -------------------- CUDA Kernels --------------------
-// Kernel for converting an image to grayscale
+
 __global__ void grayscaleKernel(pixel *d_pixels, int width, int height)
 {
     int x = blockIdx.x * blockDim.x + threadIdx.x;
@@ -127,15 +126,10 @@ __global__ void sobelKernel(pixel *d_in, pixel *d_out, int width, int height)
     }
 }
 
-/* --------------------------------------------------------------------
-   Tiling parameters.
-   -------------------------------------------------------------------- */
+
 #define TILE_WIDTH 1024
 #define TILE_HEIGHT 1024
-// -------------------- Helper: process_tile --------------------
-//
-// Processes one tile of an image on the GPU using the three kernels.
-//
+
 static void process_tile(pixel *tile_in, pixel *tile_out, int tile_w, int tile_h) {
    size_t tileSizeBytes = tile_w * tile_h * sizeof(pixel);
     pixel *d_in, *d_out;
@@ -202,25 +196,14 @@ static void process_tile(pixel *tile_in, pixel *tile_out, int tile_w, int tile_h
 #endif
 }
 
-// -------------------- Public Function: run_cuda_filter --------------------
 
-/**
- * run_cuda_filter - Runs the CUDA filtering pipeline.
- * @input_filename: Path to the input GIF.
- * @output_filename: Path to the output GIF.
- *
- * This function loads the input GIF (using the common I/O functions),
- * processes each image frame in tiles using CUDA kernels (grayscale, blur, and Sobel),
- * and writes the result to the output GIF.
- *
- * Returns 0 on success, nonzero on failure.
- */
+
 int run_cuda_filter(char *input_filename, char *output_filename)
 {
     struct timeval t1, t2;
     double duration;
     
-    // Load the GIF using common I/O.
+   
     gettimeofday(&t1, NULL);
     animated_gif *image = load_pixels(input_filename);
     if (image == NULL) {

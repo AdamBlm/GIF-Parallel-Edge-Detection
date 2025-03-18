@@ -12,15 +12,15 @@
 #define SOBELF_DEBUG 0
 #endif
 
-/* MPI Tags for messaging */
+
 #define MPI_TAG_IMAGE_DATA 100
 #define MPI_TAG_IMAGE_DIMS 101
 #define MPI_TAG_RESULT 102
 
-/* Tiling parameter for OpenMP filtering */
+
 #define TILE_SIZE 64
 
-/* Helper macro to convert 2D indices into a linear index */
+
 #define CONV(l,c,nb_c) ((l) * (nb_c) + (c))
 
 /* Min function helper */
@@ -28,20 +28,20 @@ static inline int min(int a, int b) {
     return (a < b) ? a : b;
 }
 
-/* Helper for collective operations */
+
 typedef struct scatter_info {
-    int *sendcounts;  /* Number of elements to send to each process */
-    int *displs;      /* Displacement for each process */
-    int *image_counts; /* Number of images per process */
-    int *image_displs; /* Displacement for image indices */
-    int *scatter_byte_counts; /* Number of bytes to send to each process - cached for reuse */
-    int *scatter_byte_displs; /* Byte displacement for each process - cached for reuse */
+    int *sendcounts; 
+    int *displs;     
+    int *image_counts; 
+    int *image_displs; 
+    int *scatter_byte_counts; 
+    int *scatter_byte_displs;
 } scatter_info;
 
-/* Apply grayscale filter to an image */
+
 static void apply_gray_filter_to_image(pixel *p, int width, int height)
 {
-    // Initialize all pixels with first touch by the thread that will use it
+    
     #pragma omp parallel for default(none) shared(p, width, height) schedule(static)
     for (int j = 0; j < height; j++)
     {

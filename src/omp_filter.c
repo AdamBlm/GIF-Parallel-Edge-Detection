@@ -12,9 +12,7 @@
 #define SOBELF_DEBUG 0
 #endif
 
-/* ------------------------------------------------------------------
- * Helper Macros
- * ------------------------------------------------------------------ */
+
 #define CONV(l,c,nb_c) ((l)*(nb_c)+(c))
 #define TILE_SIZE 64
 
@@ -22,11 +20,8 @@ static inline int min(int a, int b) {
     return (a < b) ? a : b;
 }
 
-/* ------------------------------------------------------------------
- * Filtering Functions (OpenMP Optimized)
- * ------------------------------------------------------------------ */
 
-/* Apply grayscale filter to the image */
+
 static void apply_gray_filter(animated_gif * image)
 {
     pixel ** p = image->p;
@@ -50,7 +45,7 @@ static void apply_gray_filter(animated_gif * image)
     }
 }
 
-/* Apply blur filter with tiling optimization */
+
 static void apply_blur_filter(animated_gif * image, int size, int threshold)
 {
     pixel ** p = image->p;
@@ -145,7 +140,7 @@ static void apply_blur_filter(animated_gif * image, int size, int threshold)
     free(buffer);
 }
 
-/* Apply Sobel filter with optimized multi-channel implementation */
+
 static void apply_sobel_filter(animated_gif * image)
 {
     pixel ** p = image->p;
@@ -265,15 +260,7 @@ static void apply_sobel_filter(animated_gif * image)
     free(sobel_buffer);
 }
 
-/* ------------------------------------------------------------------
- * run_omp_filter: The Adaptive OpenMP Filtering Pipeline
- * ------------------------------------------------------------------
- *
- * This function loads the input GIF, applies grayscale, blur, and Sobel filters
- * using optimized OpenMP routines, and then writes the output GIF.
- *
- * Returns 0 on success, nonzero on failure.
- */
+
 int run_omp_filter(char *input_filename, char *output_filename, int num_threads)
 {
     if(num_threads > 0) {
@@ -284,7 +271,7 @@ int run_omp_filter(char *input_filename, char *output_filename, int num_threads)
     struct timeval t1, t2;
     double duration;
 
-    /* Load the GIF */
+
     gettimeofday(&t1, NULL);
     animated_gif *image = load_pixels(input_filename);
     if (image == NULL) {
@@ -295,7 +282,7 @@ int run_omp_filter(char *input_filename, char *output_filename, int num_threads)
     printf("GIF loaded from file %s with %d image(s) in %lf s\n", 
            input_filename, image->n_images, duration);
 
-    /* Filtering Stage */
+   
     gettimeofday(&t1, NULL);
     apply_gray_filter(image);
     apply_blur_filter(image, 3, 0);
@@ -304,7 +291,7 @@ int run_omp_filter(char *input_filename, char *output_filename, int num_threads)
     duration = (t2.tv_sec - t1.tv_sec) + ((t2.tv_usec - t1.tv_usec)/1e6);
     printf("SOBEL done in %lf s\n", duration);
 
-    /* Export Stage */
+   
     gettimeofday(&t1, NULL);
     if (!store_pixels(output_filename, image)) {
         return 1;

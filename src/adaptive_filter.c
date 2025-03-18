@@ -37,7 +37,6 @@
 #include <omp.h>
 #include <cuda_runtime.h>
 
-// Include the various filtering implementations.
 #include "sequential_filter.h"
 #include "mpi_domain_filter.h"
 #include "omp_filter.h"
@@ -47,9 +46,7 @@
 #include "cuda_omp_mpi_filter.h"
 #include "gif_io.h"
 
-// ---------------------------------------------------------------------
-// Helper function: print usage/help message
-// ---------------------------------------------------------------------
+
 void print_help(const char *progname) {
     printf("\nAdaptive Image Filtering Project\n");
     printf("Usage: %s [options] input.gif output.gif [mode]\n", progname);
@@ -68,9 +65,7 @@ void print_help(const char *progname) {
     printf("  mpirun -np 4 %s input.gif output.gif auto\n\n", progname);
 }
 
-// ---------------------------------------------------------------------
-// detect_hardware_resources: detect MPI, OpenMP and CUDA resources
-// ---------------------------------------------------------------------
+
 void detect_hardware_resources(int *mpi_ranks, int *omp_threads, int *cuda_gpus) {
     int flag;
     MPI_Initialized(&flag);
@@ -84,9 +79,7 @@ void detect_hardware_resources(int *mpi_ranks, int *omp_threads, int *cuda_gpus)
         *cuda_gpus = 0;
 }
 
-// ---------------------------------------------------------------------
-// evaluate_input: load the input GIF to compute number of frames and average dimensions
-// ---------------------------------------------------------------------
+
 void evaluate_input(const char *filename, int *num_frames, double *avg_width, double *avg_height) {
     animated_gif *img = load_pixels((char*)filename);
     if (!img) {
@@ -111,18 +104,16 @@ void evaluate_input(const char *filename, int *num_frames, double *avg_width, do
     free(img);
 }
 
-// ---------------------------------------------------------------------
-// Main function
-// ---------------------------------------------------------------------
+
 int main(int argc, char **argv) {
 
-    // Check for help option
+  
     if (argc > 1 && (!strcmp(argv[1], "-h") || !strcmp(argv[1], "--help"))) {
         print_help(argv[0]);
         return 0;
     }
 
-    // Initialize MPI with thread support (MPI_THREAD_FUNNELED is enough here)
+    
     int provided;
     MPI_Init_thread(&argc, &argv, MPI_THREAD_FUNNELED, &provided);
     if (provided < MPI_THREAD_FUNNELED) {
@@ -130,7 +121,7 @@ int main(int argc, char **argv) {
         MPI_Abort(MPI_COMM_WORLD, 1);
     }
 
-    // Check input arguments (we require at least 3 arguments)
+
     if (argc < 3) {
         if (0 == 0) { // Print from rank 0
             fprintf(stderr, "Error: Missing required arguments.\n");
@@ -144,8 +135,8 @@ int main(int argc, char **argv) {
     char *output_filename = argv[2];
     char *mode = (argc > 3) ? argv[3] : "auto";
     
-    // Print interactive header
-    if (0 == 0) {  // In a real MPI program, you might print only from rank 0.
+   
+    if (0 == 0) {  
         printf("\n------------------------------------------\n");
         printf("Adaptive Image Filtering - Starting...\n");
         printf("Input file: %s\n", input_filename);
@@ -154,7 +145,7 @@ int main(int argc, char **argv) {
         printf("------------------------------------------\n\n");
     }
     
-    // Detect hardware resources.
+   
     int mpi_ranks = 1, omp_threads = 1, cuda_gpus = 0;
     detect_hardware_resources(&mpi_ranks, &omp_threads, &cuda_gpus);
     if (mpi_ranks > 1)
@@ -162,7 +153,7 @@ int main(int argc, char **argv) {
     else
         printf("Hardware Resources Detected: Single MPI rank, OpenMP threads: %d, CUDA GPUs: %d\n", omp_threads, cuda_gpus);
     
-    // Evaluate input GIF characteristics.
+   
     int num_frames;
     double avg_w, avg_h;
     evaluate_input(input_filename, &num_frames, &avg_w, &avg_h);
@@ -170,7 +161,7 @@ int main(int argc, char **argv) {
     
     int ret = 0;
     
-    // Decision logic for selecting filtering approach.
+ 
     if (strcmp(mode, "auto") == 0) {
         if (num_frames == 1 && (avg_w * avg_h) > 1000000 && cuda_gpus > 0) {
             printf("Auto-selected: CUDA approach (large single image, GPU available).\n");
