@@ -1,0 +1,71 @@
+# Makefile for Hybrid MPI + OpenMP + CUDA implementation
+
+# Compilers
+NVCC = nvcc
+MPICC = mpicc
+CC = gcc
+
+# Get CUDA path from environment
+CUDA_PATH ?= $(CUDA_ROOT)
+ifeq ($(CUDA_PATH),)
+    CUDA_PATH := /usr/local/cuda
+endif
+
+# MPI include path from set_env.sh
+MPI_PATH ?= $(MPI_ROOT)
+ifeq ($(MPI_PATH),)
+    MPI_PATH := /users/profs/2016/patrick.carribault/local/openmpi/install
+endif
+
+# Compiler flags
+CFLAGS = -O3 -Iinclude -Isrc -fopenmp
+MPI_FLAGS = -I$(MPI_PATH)/include
+# Use -Xcompiler for passing C compiler options
+NVCC_FLAGS = -I$(CUDA_PATH)/include -Iinclude -Isrc $(MPI_FLAGS) -Xcompiler "-O3 -fopenmp" -x cu
+LDFLAGS = -L$(CUDA_PATH)/lib64 -L$(CUDA_PATH)/lib -lcudart -lm -fopenmp -lstdc++
+
+# Object files directory
+OBJDIR = obj
+
+# Source directory
+SRCDIR = src
+
+# Make sure the obj directory exists
+$(OBJDIR):
+	mkdir -p $(OBJDIR)
+
+# GIF library object files
+SOBEL_OBJ = $(OBJDIR)/dgif_lib.o \
+	$(OBJDIR)/egif_lib.o \
+	$(OBJDIR)/gif_err.o \
+	$(OBJDIR)/gif_font.o \
+	$(OBJDIR)/gif_hash.o \
+	$(OBJDIR)/gifalloc.o \
+	$(OBJDIR)/openbsd-reallocarray.o \
+	$(OBJDIR)/quantize.o \
+	$(OBJDIR)/gif_utils.o
+
+# Main target
+all: $(OBJDIR) sobelf_mpi_omp_cuda 
+
+sobelf_mpi_omp_cuda: $(OBJDIR) $(SOBEL_OBJ) $(OBJDIR)/sobelf_mpi_omp_cuda.o
+	$(MPICC) $(CFLAGS) $(MPI_FLAGS) -o $@ $(OBJDIR)/sobelf_mpi_omp_cuda.o $(SOBEL_OBJ) $(LDFLAGS)
+
+# Compile CUDA source file
+$(OBJDIR)/sobelf_mpi_omp_cuda.o: $(SRCDIR)/sobelf_mpi_omp_cuda.cu $(SRCDIR)/gif_utils.h
+	$(NVCC) $(NVCC_FLAGS) -c -o $@ $<
+
+# Make sure gif_utils.o is built
+$(OBJDIR)/gif_utils.o: $(SRCDIR)/gif_utils.c $(SRCDIR)/gif_utils.h
+	$(CC) $(CFLAGS) -c -o $@ $<
+
+# GIF library compilation rules
+$(OBJDIR)/%.o: $(SRCDIR)/%.c
+	$(CC) $(CFLAGS) -c -o $@ $<
+
+# Clean target
+clean:
+	rm -f sobelf_mpi_omp_cuda $(OBJDIR)/sobelf_mpi_omp_cuda.o
+
+# Full rebuild
+rebuild: clean all

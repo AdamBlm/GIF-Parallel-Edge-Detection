@@ -1,0 +1,1084 @@
+typedef char __nv_bool;
+# 2896 "/usr/local/cuda/include/driver_types.h"
+struct CUstream_st;
+# 8 "/usr/include/bits/types/struct_timeval.h" 3
+struct timeval;
+# 49 "/usr/include/bits/types/struct_FILE.h" 3
+struct _IO_FILE;
+# 400 "/users/profs/2016/patrick.carribault/local//openmpi/install/include/mpi.h"
+struct ompi_communicator_t;
+# 401 "/users/profs/2016/patrick.carribault/local//openmpi/install/include/mpi.h"
+struct ompi_datatype_t;
+# 689 "/users/profs/2016/patrick.carribault/local//openmpi/install/include/mpi.h"
+enum _ZN45_INTERNAL_9eed2bae_14_sobelf_cuda_cu_bd32177bUt4_E {
+# 690 "/users/profs/2016/patrick.carribault/local//openmpi/install/include/mpi.h"
+MPI_THREAD_SINGLE,
+# 691 "/users/profs/2016/patrick.carribault/local//openmpi/install/include/mpi.h"
+MPI_THREAD_FUNNELED,
+# 692 "/users/profs/2016/patrick.carribault/local//openmpi/install/include/mpi.h"
+MPI_THREAD_SERIALIZED,
+# 693 "/users/profs/2016/patrick.carribault/local//openmpi/install/include/mpi.h"
+MPI_THREAD_MULTIPLE};
+# 960 "/users/profs/2016/patrick.carribault/local//openmpi/install/include/mpi.h"
+struct ompi_predefined_communicator_t;
+# 989 "/users/profs/2016/patrick.carribault/local//openmpi/install/include/mpi.h"
+struct ompi_predefined_datatype_t;
+# 71 "include/gif_lib.h"
+struct GifFileType;
+# 14 "src/gif_utils.h"
+struct pixel;
+# 22 "src/gif_utils.h"
+struct animated_gif;
+# 49 "src/sobelf_cuda.cu"
+struct scatter_info;
+# 160 "/usr/include/bits/types.h" 3
+typedef long __time_t;
+# 162 "/usr/include/bits/types.h" 3
+typedef long __suseconds_t;
+# 209 "/usr/lib/gcc/x86_64-redhat-linux/11/include/stddef.h" 3
+typedef unsigned long size_t;
+#include "crt/device_runtime.h"
+# 8 "/usr/include/bits/types/struct_timeval.h" 3
+struct timeval {
+# 14 "/usr/include/bits/types/struct_timeval.h" 3
+__time_t tv_sec;
+# 15 "/usr/include/bits/types/struct_timeval.h" 3
+__suseconds_t tv_usec;};
+# 7 "/usr/include/bits/types/FILE.h" 3
+typedef struct _IO_FILE FILE;
+# 400 "/users/profs/2016/patrick.carribault/local//openmpi/install/include/mpi.h"
+typedef struct ompi_communicator_t *MPI_Comm;
+# 401 "/users/profs/2016/patrick.carribault/local//openmpi/install/include/mpi.h"
+typedef struct ompi_datatype_t *MPI_Datatype;
+# 85 "include/gif_lib.h"
+typedef struct GifFileType GifFileType;
+# 14 "src/gif_utils.h"
+struct pixel {
+# 16 "src/gif_utils.h"
+int r;
+# 17 "src/gif_utils.h"
+int g;
+# 18 "src/gif_utils.h"
+int b;};
+# 19 "src/gif_utils.h"
+typedef struct pixel pixel;
+# 22 "src/gif_utils.h"
+struct animated_gif {
+# 24 "src/gif_utils.h"
+int n_images;
+# 25 "src/gif_utils.h"
+int *width;
+# 26 "src/gif_utils.h"
+int *height;
+# 27 "src/gif_utils.h"
+pixel **p;
+# 28 "src/gif_utils.h"
+GifFileType *g;};
+# 29 "src/gif_utils.h"
+typedef struct animated_gif animated_gif;
+# 49 "src/sobelf_cuda.cu"
+struct scatter_info {
+# 50 "src/sobelf_cuda.cu"
+int *sendcounts;
+# 51 "src/sobelf_cuda.cu"
+int *displs;
+# 52 "src/sobelf_cuda.cu"
+int *image_counts;
+# 53 "src/sobelf_cuda.cu"
+int *image_displs;
+# 54 "src/sobelf_cuda.cu"
+int *scatter_byte_counts;
+# 55 "src/sobelf_cuda.cu"
+int *scatter_byte_displs;};
+# 56 "src/sobelf_cuda.cu"
+typedef struct scatter_info scatter_info;
+# 2441 "/usr/include/c++/11/x86_64-redhat-linux/bits/c++config.h" 3
+typedef unsigned long _ZSt6size_t;
+# 157 "/usr/local/cuda/include/crt/common_functions.h"
+___device__(extern  __no_sc__) __attribute__((__alloc_size__(1))) __attribute__((__malloc__)) __attribute__((__nothrow__)) void *malloc(size_t);
+# 158 "/usr/local/cuda/include/crt/common_functions.h"
+___device__(extern  __no_sc__) __attribute__((__nothrow__)) void free(void *);
+#if !defined(__CUDABE__)
+# 231 "/usr/local/cuda/include/crt/math_functions.h"
+ __device_builtin__ ___device__(extern  __no_sc__) __attribute__((__nothrow__)) __attribute__((__const__)) int abs(int);
+#endif
+#if !defined(__CUDABE__)
+#endif
+#if !defined(__CUDABE__)
+#endif
+# 112 "/usr/local/cuda/include/cuda_device_runtime_api.h"
+___device__(static  __no_sc__) __inline__ enum cudaError __cudaCDP2Malloc(void **, size_t);
+# 248 "/usr/local/cuda/include/cuda_device_runtime_api.h"
+___device__(extern  __no_sc__) enum cudaError __cudaCDP2GetLastError(void);
+# 250 "/usr/local/cuda/include/cuda_device_runtime_api.h"
+___device__(extern  __no_sc__) const char *__cudaCDP2GetErrorString(enum cudaError);
+# 252 "/usr/local/cuda/include/cuda_device_runtime_api.h"
+___device__(extern  __no_sc__) enum cudaError __cudaCDP2GetDeviceCount(int *);
+# 265 "/usr/local/cuda/include/cuda_device_runtime_api.h"
+___device__(extern  __no_sc__) enum cudaError __cudaCDP2Free(void *);
+# 515 "/usr/local/cuda/include/cuda_device_runtime_api.h"
+___device__(static  __no_sc__) __inline__ enum cudaError _ZN45_INTERNAL_9eed2bae_14_sobelf_cuda_cu_bd32177b16cudaGetLastErrorEv(void);
+# 525 "/usr/local/cuda/include/cuda_device_runtime_api.h"
+___device__(static  __no_sc__) __inline__ const char *_ZN45_INTERNAL_9eed2bae_14_sobelf_cuda_cu_bd32177b18cudaGetErrorStringE9cudaError(enum cudaError);
+# 535 "/usr/local/cuda/include/cuda_device_runtime_api.h"
+___device__(static  __no_sc__) __inline__ enum cudaError _ZN45_INTERNAL_9eed2bae_14_sobelf_cuda_cu_bd32177b18cudaGetDeviceCountEPi(int *);
+# 600 "/usr/local/cuda/include/cuda_device_runtime_api.h"
+___device__(static  __no_sc__) __inline__ enum cudaError _ZN45_INTERNAL_9eed2bae_14_sobelf_cuda_cu_bd32177b8cudaFreeEPv(void *);
+# 605 "/usr/local/cuda/include/cuda_device_runtime_api.h"
+___device__(static  __no_sc__) __inline__ enum cudaError _ZN45_INTERNAL_9eed2bae_14_sobelf_cuda_cu_bd32177b10cudaMallocEPPvm(void **, size_t);
+#if !defined(__CUDABE__)
+# 97 "/usr/local/cuda/include/crt/common_functions.h"
+ __device_builtin__ ___device__(extern  __no_sc__) __attribute__((__nothrow__)) void *memcpy(void *__restrict__, const void *__restrict__, size_t);
+#endif
+#if !defined(__CUDABE__)
+# 153 "/usr/local/cuda/include/crt/common_functions.h"
+ __device_builtin__ ___device__(extern  __no_sc__) int printf(const char *__restrict__, ...);
+#endif
+#if !defined(__CUDABE__)
+#endif
+#if !defined(__CUDABE__)
+# 311 "/usr/local/cuda/include/crt/math_functions.h"
+ __device_builtin__ ___device__(extern  __no_sc__) int min(const int, const int);
+#endif
+#if !defined(__CUDABE__)
+#endif
+#if !defined(__CUDABE__)
+#endif
+#if !defined(__CUDABE__)
+# 386 "/usr/local/cuda/include/crt/math_functions.h"
+ __device_builtin__ ___device__(extern  __no_sc__) int max(const int, const int);
+#endif
+#if !defined(__CUDABE__)
+#endif
+#if !defined(__CUDABE__)
+#endif
+#if !defined(__CUDABE__)
+#endif
+#if !defined(__CUDABE__)
+#endif
+#if !defined(__CUDABE__)
+#endif
+#if !defined(__CUDABE__)
+#endif
+#if !defined(__CUDABE__)
+#endif
+#if !defined(__CUDABE__)
+#endif
+#if !defined(__CUDABE__)
+#endif
+#if !defined(__CUDABE__)
+#endif
+#if !defined(__CUDABE__)
+#endif
+#if !defined(__CUDABE__)
+#endif
+#if !defined(__CUDABE__)
+#endif
+#if !defined(__CUDABE__)
+#endif
+#if !defined(__CUDABE__)
+#endif
+#if !defined(__CUDABE__)
+#endif
+#if !defined(__CUDABE__)
+#endif
+#if !defined(__CUDABE__)
+#endif
+#if !defined(__CUDABE__)
+#endif
+#if !defined(__CUDABE__)
+#endif
+#if !defined(__CUDABE__)
+#endif
+#if !defined(__CUDABE__)
+#endif
+#if !defined(__CUDABE__)
+#endif
+#if !defined(__CUDABE__)
+#endif
+#if !defined(__CUDABE__)
+#endif
+#if !defined(__CUDABE__)
+#endif
+#if !defined(__CUDABE__)
+#endif
+#if !defined(__CUDABE__)
+#endif
+#if !defined(__CUDABE__)
+#endif
+#if !defined(__CUDABE__)
+#endif
+#if !defined(__CUDABE__)
+#endif
+#if !defined(__CUDABE__)
+#endif
+#if !defined(__CUDABE__)
+#endif
+#if !defined(__CUDABE__)
+#endif
+#if !defined(__CUDABE__)
+#endif
+#if !defined(__CUDABE__)
+#endif
+#if !defined(__CUDABE__)
+#endif
+#if !defined(__CUDABE__)
+#endif
+#if !defined(__CUDABE__)
+#endif
+#if !defined(__CUDABE__)
+#endif
+#if !defined(__CUDABE__)
+#endif
+#if !defined(__CUDABE__)
+#endif
+#if !defined(__CUDABE__)
+#endif
+#if !defined(__CUDABE__)
+#endif
+#if !defined(__CUDABE__)
+#endif
+#if !defined(__CUDABE__)
+#endif
+#if !defined(__CUDABE__)
+#endif
+#if !defined(__CUDABE__)
+#endif
+#if !defined(__CUDABE__)
+#endif
+#if !defined(__CUDABE__)
+#endif
+#if !defined(__CUDABE__)
+#endif
+#if !defined(__CUDABE__)
+#endif
+#if !defined(__CUDABE__)
+#endif
+#if !defined(__CUDABE__)
+#endif
+#if !defined(__CUDABE__)
+#endif
+#if !defined(__CUDABE__)
+#endif
+#if !defined(__CUDABE__)
+#endif
+#if !defined(__CUDABE__)
+#endif
+#if !defined(__CUDABE__)
+#endif
+#if !defined(__CUDABE__)
+#endif
+#if !defined(__CUDABE__)
+#endif
+#if !defined(__CUDABE__)
+#endif
+#if !defined(__CUDABE__)
+#endif
+#if !defined(__CUDABE__)
+#endif
+#if !defined(__CUDABE__)
+#endif
+#if !defined(__CUDABE__)
+#endif
+#if !defined(__CUDABE__)
+#endif
+#if !defined(__CUDABE__)
+#endif
+#if !defined(__CUDABE__)
+#endif
+#if !defined(__CUDABE__)
+#endif
+#if !defined(__CUDABE__)
+#endif
+#if !defined(__CUDABE__)
+#endif
+#if !defined(__CUDABE__)
+#endif
+#if !defined(__CUDABE__)
+#endif
+#if !defined(__CUDABE__)
+#endif
+#if !defined(__CUDABE__)
+#endif
+#if !defined(__CUDABE__)
+#endif
+#if !defined(__CUDABE__)
+#endif
+#if !defined(__CUDABE__)
+#endif
+#if !defined(__CUDABE__)
+#endif
+#if !defined(__CUDABE__)
+#endif
+#if !defined(__CUDABE__)
+#endif
+#if !defined(__CUDABE__)
+#endif
+#if !defined(__CUDABE__)
+#endif
+#if !defined(__CUDABE__)
+#endif
+#if !defined(__CUDABE__)
+#endif
+#if !defined(__CUDABE__)
+#endif
+#if !defined(__CUDABE__)
+# 4481 "/usr/local/cuda/include/crt/math_functions.h"
+ __device_builtin__ ___device__(extern  __no_sc__) __attribute__((__nothrow__)) float sqrtf(float);
+#endif
+#if !defined(__CUDABE__)
+# 173 "/usr/local/cuda/include/crt/device_functions.h"
+ __device_builtin__ ___device__(extern  __no_sc__) void __syncthreads(void);
+#endif
+# 2912 "/usr/local/cuda/include/crt/device_functions.h"
+___device__(extern  __no_sc__) unsigned __cudaPushCallConfiguration(struct dim3, struct dim3, size_t, struct CUstream_st *);
+# 163 "src/sobelf_cuda.cu"
+__global__ __var_used__ extern void _Z16grayscale_kernelP5pixelii(pixel *, int, int);
+# 181 "src/sobelf_cuda.cu"
+__global__ __var_used__ extern void _Z11blur_kernelP5pixelS0_iii(pixel *, pixel *, int, int, int);
+# 242 "src/sobelf_cuda.cu"
+__global__ __var_used__ extern void _Z24check_convergence_kernelP5pixelS0_iiiPi(pixel *, pixel *, int, int, int, int *);
+# 262 "src/sobelf_cuda.cu"
+__global__ __var_used__ extern void _Z12sobel_kernelP5pixelS0_ii(pixel *, pixel *, int, int);
+# 431 "/usr/local/cuda/include/vector_types.h"
+___device__(static  __no_sc__) __inline__ void _ZN4dim3C1Ejjj(struct dim3 *const, unsigned, unsigned, unsigned);
+___device__(static  __no_sc__) __inline__ void _ZN4dim3C2Ejjj(struct dim3 *const, unsigned, unsigned, unsigned);
+# 183 "src/sobelf_cuda.cu"
+extern  __shared__ pixel sharedMem[];
+#include "common_functions.h"
+#if !defined(__CUDABE__)
+#endif
+#if !defined(__CUDABE__)
+#endif
+#if !defined(__CUDABE__)
+#endif
+# 112 "/usr/local/cuda/include/cuda_device_runtime_api.h"
+___device__(static  __no_sc__) __inline__ enum cudaError __cudaCDP2Malloc(
+# 112 "/usr/local/cuda/include/cuda_device_runtime_api.h"
+void **p, 
+# 112 "/usr/local/cuda/include/cuda_device_runtime_api.h"
+size_t s){
+# 113 "/usr/local/cuda/include/cuda_device_runtime_api.h"
+{
+# 114 "/usr/local/cuda/include/cuda_device_runtime_api.h"
+return cudaErrorUnknown;
+# 115 "/usr/local/cuda/include/cuda_device_runtime_api.h"
+}}
+# 515 "/usr/local/cuda/include/cuda_device_runtime_api.h"
+___device__(static  __no_sc__) __inline__ enum cudaError _ZN45_INTERNAL_9eed2bae_14_sobelf_cuda_cu_bd32177b16cudaGetLastErrorEv(void){
+# 516 "/usr/local/cuda/include/cuda_device_runtime_api.h"
+{
+# 517 "/usr/local/cuda/include/cuda_device_runtime_api.h"
+return __cudaCDP2GetLastError();
+# 518 "/usr/local/cuda/include/cuda_device_runtime_api.h"
+}}
+# 525 "/usr/local/cuda/include/cuda_device_runtime_api.h"
+___device__(static  __no_sc__) __inline__ const char *_ZN45_INTERNAL_9eed2bae_14_sobelf_cuda_cu_bd32177b18cudaGetErrorStringE9cudaError(
+# 525 "/usr/local/cuda/include/cuda_device_runtime_api.h"
+enum cudaError error){
+# 526 "/usr/local/cuda/include/cuda_device_runtime_api.h"
+{
+# 527 "/usr/local/cuda/include/cuda_device_runtime_api.h"
+return __cudaCDP2GetErrorString(error);
+# 528 "/usr/local/cuda/include/cuda_device_runtime_api.h"
+}}
+# 535 "/usr/local/cuda/include/cuda_device_runtime_api.h"
+___device__(static  __no_sc__) __inline__ enum cudaError _ZN45_INTERNAL_9eed2bae_14_sobelf_cuda_cu_bd32177b18cudaGetDeviceCountEPi(
+# 535 "/usr/local/cuda/include/cuda_device_runtime_api.h"
+int *count){
+# 536 "/usr/local/cuda/include/cuda_device_runtime_api.h"
+{
+# 537 "/usr/local/cuda/include/cuda_device_runtime_api.h"
+return __cudaCDP2GetDeviceCount(count);
+# 538 "/usr/local/cuda/include/cuda_device_runtime_api.h"
+}}
+# 600 "/usr/local/cuda/include/cuda_device_runtime_api.h"
+___device__(static  __no_sc__) __inline__ enum cudaError _ZN45_INTERNAL_9eed2bae_14_sobelf_cuda_cu_bd32177b8cudaFreeEPv(
+# 600 "/usr/local/cuda/include/cuda_device_runtime_api.h"
+void *devPtr){
+# 601 "/usr/local/cuda/include/cuda_device_runtime_api.h"
+{
+# 602 "/usr/local/cuda/include/cuda_device_runtime_api.h"
+return __cudaCDP2Free(devPtr);
+# 603 "/usr/local/cuda/include/cuda_device_runtime_api.h"
+}}
+# 605 "/usr/local/cuda/include/cuda_device_runtime_api.h"
+___device__(static  __no_sc__) __inline__ enum cudaError _ZN45_INTERNAL_9eed2bae_14_sobelf_cuda_cu_bd32177b10cudaMallocEPPvm(
+# 605 "/usr/local/cuda/include/cuda_device_runtime_api.h"
+void **devPtr, 
+# 605 "/usr/local/cuda/include/cuda_device_runtime_api.h"
+size_t size){
+# 606 "/usr/local/cuda/include/cuda_device_runtime_api.h"
+{  void **__T0;
+ size_t __T1;
+# 607 "/usr/local/cuda/include/cuda_device_runtime_api.h"
+return ((__T0 = devPtr) , (void)(__T1 = size)) , (__cudaCDP2Malloc(__T0, __T1));
+# 608 "/usr/local/cuda/include/cuda_device_runtime_api.h"
+}}
+#if !defined(__CUDABE__)
+#endif
+#if !defined(__CUDABE__)
+#endif
+#if !defined(__CUDABE__)
+#endif
+#if !defined(__CUDABE__)
+#endif
+#if !defined(__CUDABE__)
+#endif
+#if !defined(__CUDABE__)
+#endif
+#if !defined(__CUDABE__)
+#endif
+#if !defined(__CUDABE__)
+#endif
+#if !defined(__CUDABE__)
+#endif
+#if !defined(__CUDABE__)
+#endif
+#if !defined(__CUDABE__)
+#endif
+#if !defined(__CUDABE__)
+#endif
+#if !defined(__CUDABE__)
+#endif
+#if !defined(__CUDABE__)
+#endif
+#if !defined(__CUDABE__)
+#endif
+#if !defined(__CUDABE__)
+#endif
+#if !defined(__CUDABE__)
+#endif
+#if !defined(__CUDABE__)
+#endif
+#if !defined(__CUDABE__)
+#endif
+#if !defined(__CUDABE__)
+#endif
+#if !defined(__CUDABE__)
+#endif
+#if !defined(__CUDABE__)
+#endif
+#if !defined(__CUDABE__)
+#endif
+#if !defined(__CUDABE__)
+#endif
+#if !defined(__CUDABE__)
+#endif
+#if !defined(__CUDABE__)
+#endif
+#if !defined(__CUDABE__)
+#endif
+#if !defined(__CUDABE__)
+#endif
+#if !defined(__CUDABE__)
+#endif
+#if !defined(__CUDABE__)
+#endif
+#if !defined(__CUDABE__)
+#endif
+#if !defined(__CUDABE__)
+#endif
+#if !defined(__CUDABE__)
+#endif
+#if !defined(__CUDABE__)
+#endif
+#if !defined(__CUDABE__)
+#endif
+#if !defined(__CUDABE__)
+#endif
+#if !defined(__CUDABE__)
+#endif
+#if !defined(__CUDABE__)
+#endif
+#if !defined(__CUDABE__)
+#endif
+#if !defined(__CUDABE__)
+#endif
+#if !defined(__CUDABE__)
+#endif
+#if !defined(__CUDABE__)
+#endif
+#if !defined(__CUDABE__)
+#endif
+#if !defined(__CUDABE__)
+#endif
+#if !defined(__CUDABE__)
+#endif
+#if !defined(__CUDABE__)
+#endif
+#if !defined(__CUDABE__)
+#endif
+#if !defined(__CUDABE__)
+#endif
+#if !defined(__CUDABE__)
+#endif
+#if !defined(__CUDABE__)
+#endif
+#if !defined(__CUDABE__)
+#endif
+#if !defined(__CUDABE__)
+#endif
+#if !defined(__CUDABE__)
+#endif
+#if !defined(__CUDABE__)
+#endif
+#if !defined(__CUDABE__)
+#endif
+#if !defined(__CUDABE__)
+#endif
+#if !defined(__CUDABE__)
+#endif
+#if !defined(__CUDABE__)
+#endif
+#if !defined(__CUDABE__)
+#endif
+#if !defined(__CUDABE__)
+#endif
+#if !defined(__CUDABE__)
+#endif
+#if !defined(__CUDABE__)
+#endif
+#if !defined(__CUDABE__)
+#endif
+#if !defined(__CUDABE__)
+#endif
+#if !defined(__CUDABE__)
+#endif
+#if !defined(__CUDABE__)
+#endif
+#if !defined(__CUDABE__)
+#endif
+#if !defined(__CUDABE__)
+#endif
+#if !defined(__CUDABE__)
+#endif
+#if !defined(__CUDABE__)
+#endif
+#if !defined(__CUDABE__)
+#endif
+#if !defined(__CUDABE__)
+#endif
+#if !defined(__CUDABE__)
+#endif
+#if !defined(__CUDABE__)
+#endif
+#if !defined(__CUDABE__)
+#endif
+#if !defined(__CUDABE__)
+#endif
+#if !defined(__CUDABE__)
+#endif
+#if !defined(__CUDABE__)
+#endif
+#if !defined(__CUDABE__)
+#endif
+#if !defined(__CUDABE__)
+#endif
+#if !defined(__CUDABE__)
+#endif
+#if !defined(__CUDABE__)
+#endif
+#if !defined(__CUDABE__)
+#endif
+#if !defined(__CUDABE__)
+#endif
+#if !defined(__CUDABE__)
+#endif
+#if !defined(__CUDABE__)
+#endif
+#if !defined(__CUDABE__)
+#endif
+#if !defined(__CUDABE__)
+#endif
+#if !defined(__CUDABE__)
+#endif
+#if !defined(__CUDABE__)
+#endif
+#if !defined(__CUDABE__)
+#endif
+#if !defined(__CUDABE__)
+#endif
+#if !defined(__CUDABE__)
+#endif
+#if !defined(__CUDABE__)
+#endif
+#if !defined(__CUDABE__)
+#endif
+#if !defined(__CUDABE__)
+#endif
+# 163 "src/sobelf_cuda.cu"
+__global__ __var_used__ void _Z16grayscale_kernelP5pixelii(
+# 163 "src/sobelf_cuda.cu"
+pixel *d_pixels, 
+# 163 "src/sobelf_cuda.cu"
+int width, 
+# 163 "src/sobelf_cuda.cu"
+int height){
+# 164 "src/sobelf_cuda.cu"
+{
+# 165 "src/sobelf_cuda.cu"
+ int __cuda_local_var_36871_9_non_const_x;
+# 166 "src/sobelf_cuda.cu"
+ int __cuda_local_var_36872_9_non_const_y;
+# 165 "src/sobelf_cuda.cu"
+__cuda_local_var_36871_9_non_const_x = ((int)(((blockIdx.x) * (blockDim.x)) + (threadIdx.x)));
+# 166 "src/sobelf_cuda.cu"
+__cuda_local_var_36872_9_non_const_y = ((int)(((blockIdx.y) * (blockDim.y)) + (threadIdx.y)));
+# 168 "src/sobelf_cuda.cu"
+if ((__cuda_local_var_36871_9_non_const_x < width) && (__cuda_local_var_36872_9_non_const_y < height))
+# 168 "src/sobelf_cuda.cu"
+{
+# 169 "src/sobelf_cuda.cu"
+ int __cuda_local_var_36875_13_non_const_idx;
+# 170 "src/sobelf_cuda.cu"
+ int __cuda_local_var_36876_13_non_const_moy;
+# 169 "src/sobelf_cuda.cu"
+__cuda_local_var_36875_13_non_const_idx = ((__cuda_local_var_36872_9_non_const_y * width) + __cuda_local_var_36871_9_non_const_x);
+# 170 "src/sobelf_cuda.cu"
+__cuda_local_var_36876_13_non_const_moy = (((((d_pixels[__cuda_local_var_36875_13_non_const_idx]).r) + ((d_pixels[__cuda_local_var_36875_13_non_const_idx]).g)) + ((d_pixels[__cuda_local_var_36875_13_non_const_idx]).b)) / 3);
+# 171 "src/sobelf_cuda.cu"
+if (__cuda_local_var_36876_13_non_const_moy < 0) {
+# 171 "src/sobelf_cuda.cu"
+__cuda_local_var_36876_13_non_const_moy = 0; }
+# 172 "src/sobelf_cuda.cu"
+if (__cuda_local_var_36876_13_non_const_moy > 255) {
+# 172 "src/sobelf_cuda.cu"
+__cuda_local_var_36876_13_non_const_moy = 255; }
+# 174 "src/sobelf_cuda.cu"
+((d_pixels[__cuda_local_var_36875_13_non_const_idx]).r) = __cuda_local_var_36876_13_non_const_moy;
+# 175 "src/sobelf_cuda.cu"
+((d_pixels[__cuda_local_var_36875_13_non_const_idx]).g) = __cuda_local_var_36876_13_non_const_moy;
+# 176 "src/sobelf_cuda.cu"
+((d_pixels[__cuda_local_var_36875_13_non_const_idx]).b) = __cuda_local_var_36876_13_non_const_moy;
+# 177 "src/sobelf_cuda.cu"
+} 
+# 178 "src/sobelf_cuda.cu"
+}}
+# 181 "src/sobelf_cuda.cu"
+__global__ __var_used__ void _Z11blur_kernelP5pixelS0_iii(
+# 181 "src/sobelf_cuda.cu"
+pixel *d_in, 
+# 181 "src/sobelf_cuda.cu"
+pixel *d_out, 
+# 181 "src/sobelf_cuda.cu"
+int width, 
+# 181 "src/sobelf_cuda.cu"
+int height, 
+# 181 "src/sobelf_cuda.cu"
+int size){
+# 182 "src/sobelf_cuda.cu"
+{
+# 185 "src/sobelf_cuda.cu"
+ int __cuda_local_var_36891_9_non_const_tx;
+# 186 "src/sobelf_cuda.cu"
+ int __cuda_local_var_36892_9_non_const_ty;
+# 187 "src/sobelf_cuda.cu"
+ int __cuda_local_var_36893_9_non_const_bx;
+# 188 "src/sobelf_cuda.cu"
+ int __cuda_local_var_36894_9_non_const_by;
+# 189 "src/sobelf_cuda.cu"
+ int __cuda_local_var_36895_9_non_const_x;
+# 190 "src/sobelf_cuda.cu"
+ int __cuda_local_var_36896_9_non_const_y;
+# 193 "src/sobelf_cuda.cu"
+ int __cuda_local_var_36899_9_non_const_sharedWidth;
+# 194 "src/sobelf_cuda.cu"
+ int __cuda_local_var_36900_9_non_const_sharedHeight;
+# 185 "src/sobelf_cuda.cu"
+__cuda_local_var_36891_9_non_const_tx = ((int)(threadIdx.x));
+# 186 "src/sobelf_cuda.cu"
+__cuda_local_var_36892_9_non_const_ty = ((int)(threadIdx.y));
+# 187 "src/sobelf_cuda.cu"
+__cuda_local_var_36893_9_non_const_bx = ((int)((blockIdx.x) * (blockDim.x)));
+# 188 "src/sobelf_cuda.cu"
+__cuda_local_var_36894_9_non_const_by = ((int)((blockIdx.y) * (blockDim.y)));
+# 189 "src/sobelf_cuda.cu"
+__cuda_local_var_36895_9_non_const_x = (__cuda_local_var_36893_9_non_const_bx + __cuda_local_var_36891_9_non_const_tx);
+# 190 "src/sobelf_cuda.cu"
+__cuda_local_var_36896_9_non_const_y = (__cuda_local_var_36894_9_non_const_by + __cuda_local_var_36892_9_non_const_ty);
+# 193 "src/sobelf_cuda.cu"
+__cuda_local_var_36899_9_non_const_sharedWidth = ((int)((blockDim.x) + ((unsigned)(2 * size))));
+# 194 "src/sobelf_cuda.cu"
+__cuda_local_var_36900_9_non_const_sharedHeight = ((int)((blockDim.y) + ((unsigned)(2 * size))));
+# 197 "src/sobelf_cuda.cu"
+{
+# 197 "src/sobelf_cuda.cu"
+ int j;
+# 197 "src/sobelf_cuda.cu"
+j = __cuda_local_var_36892_9_non_const_ty;
+# 197 "src/sobelf_cuda.cu"
+for (; j < __cuda_local_var_36900_9_non_const_sharedHeight; j += (blockDim.y))
+# 197 "src/sobelf_cuda.cu"
+{
+# 198 "src/sobelf_cuda.cu"
+ int __cuda_local_var_36904_13_non_const_y_global;
+# 198 "src/sobelf_cuda.cu"
+__cuda_local_var_36904_13_non_const_y_global = ((__cuda_local_var_36894_9_non_const_by + j) - size);
+# 200 "src/sobelf_cuda.cu"
+{
+# 200 "src/sobelf_cuda.cu"
+ int i;
+# 200 "src/sobelf_cuda.cu"
+i = __cuda_local_var_36891_9_non_const_tx;
+# 200 "src/sobelf_cuda.cu"
+for (; i < __cuda_local_var_36899_9_non_const_sharedWidth; i += (blockDim.x))
+# 200 "src/sobelf_cuda.cu"
+{  int __T2;
+ int __T3;
+ int __T4;
+ int __T5;
+# 201 "src/sobelf_cuda.cu"
+ int __cuda_local_var_36907_17_non_const_x_global;
+# 204 "src/sobelf_cuda.cu"
+ int __cuda_local_var_36910_17_non_const_valid_x;
+# 205 "src/sobelf_cuda.cu"
+ int __cuda_local_var_36911_17_non_const_valid_y;
+# 201 "src/sobelf_cuda.cu"
+__cuda_local_var_36907_17_non_const_x_global = ((__cuda_local_var_36893_9_non_const_bx + i) - size);
+# 204 "src/sobelf_cuda.cu"
+__cuda_local_var_36910_17_non_const_valid_x = (max(0, (((__T2 = (width - 1)) , (void)(__T3 = __cuda_local_var_36907_17_non_const_x_global)) , (min(__T2, __T3)))));
+# 205 "src/sobelf_cuda.cu"
+__cuda_local_var_36911_17_non_const_valid_y = (max(0, (((__T4 = (height - 1)) , (void)(__T5 = __cuda_local_var_36904_13_non_const_y_global)) , (min(__T4, __T5)))));
+# 207 "src/sobelf_cuda.cu"
+((sharedMem)[((j * __cuda_local_var_36899_9_non_const_sharedWidth) + i)]) = (d_in[((__cuda_local_var_36911_17_non_const_valid_y * width) + __cuda_local_var_36910_17_non_const_valid_x)]);
+# 208 "src/sobelf_cuda.cu"
+} }
+# 209 "src/sobelf_cuda.cu"
+} }
+# 211 "src/sobelf_cuda.cu"
+__syncthreads();
+# 214 "src/sobelf_cuda.cu"
+if ((__cuda_local_var_36895_9_non_const_x < width) && (__cuda_local_var_36896_9_non_const_y < height))
+# 214 "src/sobelf_cuda.cu"
+{
+# 215 "src/sobelf_cuda.cu"
+ int __cuda_local_var_36921_13_non_const_t_r;
+# 216 "src/sobelf_cuda.cu"
+ int __cuda_local_var_36922_13_non_const_t_g;
+# 217 "src/sobelf_cuda.cu"
+ int __cuda_local_var_36923_13_non_const_t_b;
+# 218 "src/sobelf_cuda.cu"
+ int __cuda_local_var_36924_13_non_const_count;
+# 234 "src/sobelf_cuda.cu"
+ int __cuda_local_var_36940_13_non_const_idx;
+# 215 "src/sobelf_cuda.cu"
+__cuda_local_var_36921_13_non_const_t_r = 0;
+# 216 "src/sobelf_cuda.cu"
+__cuda_local_var_36922_13_non_const_t_g = 0;
+# 217 "src/sobelf_cuda.cu"
+__cuda_local_var_36923_13_non_const_t_b = 0;
+# 218 "src/sobelf_cuda.cu"
+__cuda_local_var_36924_13_non_const_count = 0;
+# 221 "src/sobelf_cuda.cu"
+{
+# 221 "src/sobelf_cuda.cu"
+ int j;
+# 221 "src/sobelf_cuda.cu"
+j = (-size);
+# 221 "src/sobelf_cuda.cu"
+for (; j <= size; j++)
+# 221 "src/sobelf_cuda.cu"
+{
+# 222 "src/sobelf_cuda.cu"
+{
+# 222 "src/sobelf_cuda.cu"
+ int i;
+# 222 "src/sobelf_cuda.cu"
+i = (-size);
+# 222 "src/sobelf_cuda.cu"
+for (; i <= size; i++)
+# 222 "src/sobelf_cuda.cu"
+{
+# 223 "src/sobelf_cuda.cu"
+ int __cuda_local_var_36929_21_non_const_sx;
+# 224 "src/sobelf_cuda.cu"
+ int __cuda_local_var_36930_21_non_const_sy;
+# 223 "src/sobelf_cuda.cu"
+__cuda_local_var_36929_21_non_const_sx = ((__cuda_local_var_36891_9_non_const_tx + i) + size);
+# 224 "src/sobelf_cuda.cu"
+__cuda_local_var_36930_21_non_const_sy = ((__cuda_local_var_36892_9_non_const_ty + j) + size);
+# 226 "src/sobelf_cuda.cu"
+__cuda_local_var_36921_13_non_const_t_r += (((sharedMem)[((__cuda_local_var_36930_21_non_const_sy * __cuda_local_var_36899_9_non_const_sharedWidth) + __cuda_local_var_36929_21_non_const_sx)]).r);
+# 227 "src/sobelf_cuda.cu"
+__cuda_local_var_36922_13_non_const_t_g += (((sharedMem)[((__cuda_local_var_36930_21_non_const_sy * __cuda_local_var_36899_9_non_const_sharedWidth) + __cuda_local_var_36929_21_non_const_sx)]).g);
+# 228 "src/sobelf_cuda.cu"
+__cuda_local_var_36923_13_non_const_t_b += (((sharedMem)[((__cuda_local_var_36930_21_non_const_sy * __cuda_local_var_36899_9_non_const_sharedWidth) + __cuda_local_var_36929_21_non_const_sx)]).b);
+# 229 "src/sobelf_cuda.cu"
+__cuda_local_var_36924_13_non_const_count++;
+# 230 "src/sobelf_cuda.cu"
+} }
+# 231 "src/sobelf_cuda.cu"
+} }
+# 234 "src/sobelf_cuda.cu"
+__cuda_local_var_36940_13_non_const_idx = ((__cuda_local_var_36896_9_non_const_y * width) + __cuda_local_var_36895_9_non_const_x);
+# 235 "src/sobelf_cuda.cu"
+((d_out[__cuda_local_var_36940_13_non_const_idx]).r) = (__cuda_local_var_36921_13_non_const_t_r / __cuda_local_var_36924_13_non_const_count);
+# 236 "src/sobelf_cuda.cu"
+((d_out[__cuda_local_var_36940_13_non_const_idx]).g) = (__cuda_local_var_36922_13_non_const_t_g / __cuda_local_var_36924_13_non_const_count);
+# 237 "src/sobelf_cuda.cu"
+((d_out[__cuda_local_var_36940_13_non_const_idx]).b) = (__cuda_local_var_36923_13_non_const_t_b / __cuda_local_var_36924_13_non_const_count);
+# 238 "src/sobelf_cuda.cu"
+} 
+# 239 "src/sobelf_cuda.cu"
+}}
+# 242 "src/sobelf_cuda.cu"
+__global__ __var_used__ void _Z24check_convergence_kernelP5pixelS0_iiiPi(
+# 242 "src/sobelf_cuda.cu"
+pixel *d_prev, 
+# 242 "src/sobelf_cuda.cu"
+pixel *d_curr, 
+# 242 "src/sobelf_cuda.cu"
+int width, 
+# 242 "src/sobelf_cuda.cu"
+int height, 
+# 243 "src/sobelf_cuda.cu"
+int threshold, 
+# 243 "src/sobelf_cuda.cu"
+int *d_continue){
+# 244 "src/sobelf_cuda.cu"
+{
+# 245 "src/sobelf_cuda.cu"
+ int __cuda_local_var_36951_9_non_const_x;
+# 246 "src/sobelf_cuda.cu"
+ int __cuda_local_var_36952_9_non_const_y;
+# 245 "src/sobelf_cuda.cu"
+__cuda_local_var_36951_9_non_const_x = ((int)(((blockIdx.x) * (blockDim.x)) + (threadIdx.x)));
+# 246 "src/sobelf_cuda.cu"
+__cuda_local_var_36952_9_non_const_y = ((int)(((blockIdx.y) * (blockDim.y)) + (threadIdx.y)));
+# 248 "src/sobelf_cuda.cu"
+if ((__cuda_local_var_36951_9_non_const_x < width) && (__cuda_local_var_36952_9_non_const_y < height))
+# 248 "src/sobelf_cuda.cu"
+{
+# 249 "src/sobelf_cuda.cu"
+ int __cuda_local_var_36955_13_non_const_idx;
+# 251 "src/sobelf_cuda.cu"
+ int __cuda_local_var_36957_13_non_const_diff_r;
+# 252 "src/sobelf_cuda.cu"
+ int __cuda_local_var_36958_13_non_const_diff_g;
+# 253 "src/sobelf_cuda.cu"
+ int __cuda_local_var_36959_13_non_const_diff_b;
+# 249 "src/sobelf_cuda.cu"
+__cuda_local_var_36955_13_non_const_idx = ((__cuda_local_var_36952_9_non_const_y * width) + __cuda_local_var_36951_9_non_const_x);
+# 251 "src/sobelf_cuda.cu"
+__cuda_local_var_36957_13_non_const_diff_r = (abs((((d_curr[__cuda_local_var_36955_13_non_const_idx]).r) - ((d_prev[__cuda_local_var_36955_13_non_const_idx]).r))));
+# 252 "src/sobelf_cuda.cu"
+__cuda_local_var_36958_13_non_const_diff_g = (abs((((d_curr[__cuda_local_var_36955_13_non_const_idx]).g) - ((d_prev[__cuda_local_var_36955_13_non_const_idx]).g))));
+# 253 "src/sobelf_cuda.cu"
+__cuda_local_var_36959_13_non_const_diff_b = (abs((((d_curr[__cuda_local_var_36955_13_non_const_idx]).b) - ((d_prev[__cuda_local_var_36955_13_non_const_idx]).b))));
+# 255 "src/sobelf_cuda.cu"
+if (((__cuda_local_var_36957_13_non_const_diff_r > threshold) || (__cuda_local_var_36958_13_non_const_diff_g > threshold)) || (__cuda_local_var_36959_13_non_const_diff_b > threshold))
+# 255 "src/sobelf_cuda.cu"
+{
+# 256 "src/sobelf_cuda.cu"
+(*d_continue) = 1;
+# 257 "src/sobelf_cuda.cu"
+}
+# 258 "src/sobelf_cuda.cu"
+} 
+# 259 "src/sobelf_cuda.cu"
+}}
+# 262 "src/sobelf_cuda.cu"
+__global__ __var_used__ void _Z12sobel_kernelP5pixelS0_ii(
+# 262 "src/sobelf_cuda.cu"
+pixel *d_in, 
+# 262 "src/sobelf_cuda.cu"
+pixel *d_out, 
+# 262 "src/sobelf_cuda.cu"
+int width, 
+# 262 "src/sobelf_cuda.cu"
+int height){
+# 263 "src/sobelf_cuda.cu"
+{
+# 266 "src/sobelf_cuda.cu"
+ int __cuda_local_var_36972_9_non_const_tx;
+# 267 "src/sobelf_cuda.cu"
+ int __cuda_local_var_36973_9_non_const_ty;
+# 268 "src/sobelf_cuda.cu"
+ int __cuda_local_var_36974_9_non_const_bx;
+# 269 "src/sobelf_cuda.cu"
+ int __cuda_local_var_36975_9_non_const_by;
+# 270 "src/sobelf_cuda.cu"
+ int __cuda_local_var_36976_9_non_const_x;
+# 271 "src/sobelf_cuda.cu"
+ int __cuda_local_var_36977_9_non_const_y;
+# 274 "src/sobelf_cuda.cu"
+ int __cuda_local_var_36980_9_non_const_sharedWidth;
+# 275 "src/sobelf_cuda.cu"
+ int __cuda_local_var_36981_9_non_const_sharedHeight;
+# 266 "src/sobelf_cuda.cu"
+__cuda_local_var_36972_9_non_const_tx = ((int)(threadIdx.x));
+# 267 "src/sobelf_cuda.cu"
+__cuda_local_var_36973_9_non_const_ty = ((int)(threadIdx.y));
+# 268 "src/sobelf_cuda.cu"
+__cuda_local_var_36974_9_non_const_bx = ((int)((blockIdx.x) * (blockDim.x)));
+# 269 "src/sobelf_cuda.cu"
+__cuda_local_var_36975_9_non_const_by = ((int)((blockIdx.y) * (blockDim.y)));
+# 270 "src/sobelf_cuda.cu"
+__cuda_local_var_36976_9_non_const_x = (__cuda_local_var_36974_9_non_const_bx + __cuda_local_var_36972_9_non_const_tx);
+# 271 "src/sobelf_cuda.cu"
+__cuda_local_var_36977_9_non_const_y = (__cuda_local_var_36975_9_non_const_by + __cuda_local_var_36973_9_non_const_ty);
+# 274 "src/sobelf_cuda.cu"
+__cuda_local_var_36980_9_non_const_sharedWidth = ((int)((blockDim.x) + 2U));
+# 275 "src/sobelf_cuda.cu"
+__cuda_local_var_36981_9_non_const_sharedHeight = ((int)((blockDim.y) + 2U));
+# 278 "src/sobelf_cuda.cu"
+{
+# 278 "src/sobelf_cuda.cu"
+ int j;
+# 278 "src/sobelf_cuda.cu"
+j = __cuda_local_var_36973_9_non_const_ty;
+# 278 "src/sobelf_cuda.cu"
+for (; j < __cuda_local_var_36981_9_non_const_sharedHeight; j += (blockDim.y))
+# 278 "src/sobelf_cuda.cu"
+{
+# 279 "src/sobelf_cuda.cu"
+ int __cuda_local_var_36985_13_non_const_y_global;
+# 279 "src/sobelf_cuda.cu"
+__cuda_local_var_36985_13_non_const_y_global = ((__cuda_local_var_36975_9_non_const_by + j) - 1);
+# 281 "src/sobelf_cuda.cu"
+{
+# 281 "src/sobelf_cuda.cu"
+ int i;
+# 281 "src/sobelf_cuda.cu"
+i = __cuda_local_var_36972_9_non_const_tx;
+# 281 "src/sobelf_cuda.cu"
+for (; i < __cuda_local_var_36980_9_non_const_sharedWidth; i += (blockDim.x))
+# 281 "src/sobelf_cuda.cu"
+{  int __T6;
+ int __T7;
+ int __T8;
+ int __T9;
+# 282 "src/sobelf_cuda.cu"
+ int __cuda_local_var_36988_17_non_const_x_global;
+# 285 "src/sobelf_cuda.cu"
+ int __cuda_local_var_36991_17_non_const_valid_x;
+# 286 "src/sobelf_cuda.cu"
+ int __cuda_local_var_36992_17_non_const_valid_y;
+# 282 "src/sobelf_cuda.cu"
+__cuda_local_var_36988_17_non_const_x_global = ((__cuda_local_var_36974_9_non_const_bx + i) - 1);
+# 285 "src/sobelf_cuda.cu"
+__cuda_local_var_36991_17_non_const_valid_x = (max(0, (((__T6 = (width - 1)) , (void)(__T7 = __cuda_local_var_36988_17_non_const_x_global)) , (min(__T6, __T7)))));
+# 286 "src/sobelf_cuda.cu"
+__cuda_local_var_36992_17_non_const_valid_y = (max(0, (((__T8 = (height - 1)) , (void)(__T9 = __cuda_local_var_36985_13_non_const_y_global)) , (min(__T8, __T9)))));
+# 288 "src/sobelf_cuda.cu"
+((sharedMem)[((j * __cuda_local_var_36980_9_non_const_sharedWidth) + i)]) = (d_in[((__cuda_local_var_36992_17_non_const_valid_y * width) + __cuda_local_var_36991_17_non_const_valid_x)]);
+# 289 "src/sobelf_cuda.cu"
+} }
+# 290 "src/sobelf_cuda.cu"
+} }
+# 292 "src/sobelf_cuda.cu"
+__syncthreads();
+# 295 "src/sobelf_cuda.cu"
+if ((((__cuda_local_var_36976_9_non_const_x > 0) && (__cuda_local_var_36976_9_non_const_x < (width - 1))) && (__cuda_local_var_36977_9_non_const_y > 0)) && (__cuda_local_var_36977_9_non_const_y < (height - 1)))
+# 295 "src/sobelf_cuda.cu"
+{
+# 296 "src/sobelf_cuda.cu"
+ int __cuda_local_var_37002_13_non_const_idx;
+# 299 "src/sobelf_cuda.cu"
+ int __cuda_local_var_37005_13_non_const_p00;
+# 300 "src/sobelf_cuda.cu"
+ int __cuda_local_var_37006_13_non_const_p01;
+# 301 "src/sobelf_cuda.cu"
+ int __cuda_local_var_37007_13_non_const_p02;
+# 302 "src/sobelf_cuda.cu"
+ int __cuda_local_var_37008_13_non_const_p10;
+# 303 "src/sobelf_cuda.cu"
+ int __cuda_local_var_37009_13_non_const_p12;
+# 304 "src/sobelf_cuda.cu"
+ int __cuda_local_var_37010_13_non_const_p20;
+# 305 "src/sobelf_cuda.cu"
+ int __cuda_local_var_37011_13_non_const_p21;
+# 306 "src/sobelf_cuda.cu"
+ int __cuda_local_var_37012_13_non_const_p22;
+# 309 "src/sobelf_cuda.cu"
+ float __cuda_local_var_37015_15_non_const_Gx_r;
+# 310 "src/sobelf_cuda.cu"
+ float __cuda_local_var_37016_15_non_const_Gy_r;
+# 312 "src/sobelf_cuda.cu"
+ float __cuda_local_var_37018_15_non_const_val_r;
+# 296 "src/sobelf_cuda.cu"
+__cuda_local_var_37002_13_non_const_idx = ((__cuda_local_var_36977_9_non_const_y * width) + __cuda_local_var_36976_9_non_const_x);
+# 299 "src/sobelf_cuda.cu"
+__cuda_local_var_37005_13_non_const_p00 = (((sharedMem)[((__cuda_local_var_36973_9_non_const_ty * __cuda_local_var_36980_9_non_const_sharedWidth) + __cuda_local_var_36972_9_non_const_tx)]).r);
+# 300 "src/sobelf_cuda.cu"
+__cuda_local_var_37006_13_non_const_p01 = (((sharedMem)[((__cuda_local_var_36973_9_non_const_ty * __cuda_local_var_36980_9_non_const_sharedWidth) + (__cuda_local_var_36972_9_non_const_tx + 1))]).r);
+# 301 "src/sobelf_cuda.cu"
+__cuda_local_var_37007_13_non_const_p02 = (((sharedMem)[((__cuda_local_var_36973_9_non_const_ty * __cuda_local_var_36980_9_non_const_sharedWidth) + (__cuda_local_var_36972_9_non_const_tx + 2))]).r);
+# 302 "src/sobelf_cuda.cu"
+__cuda_local_var_37008_13_non_const_p10 = (((sharedMem)[(((__cuda_local_var_36973_9_non_const_ty + 1) * __cuda_local_var_36980_9_non_const_sharedWidth) + __cuda_local_var_36972_9_non_const_tx)]).r);
+# 303 "src/sobelf_cuda.cu"
+__cuda_local_var_37009_13_non_const_p12 = (((sharedMem)[(((__cuda_local_var_36973_9_non_const_ty + 1) * __cuda_local_var_36980_9_non_const_sharedWidth) + (__cuda_local_var_36972_9_non_const_tx + 2))]).r);
+# 304 "src/sobelf_cuda.cu"
+__cuda_local_var_37010_13_non_const_p20 = (((sharedMem)[(((__cuda_local_var_36973_9_non_const_ty + 2) * __cuda_local_var_36980_9_non_const_sharedWidth) + __cuda_local_var_36972_9_non_const_tx)]).r);
+# 305 "src/sobelf_cuda.cu"
+__cuda_local_var_37011_13_non_const_p21 = (((sharedMem)[(((__cuda_local_var_36973_9_non_const_ty + 2) * __cuda_local_var_36980_9_non_const_sharedWidth) + (__cuda_local_var_36972_9_non_const_tx + 1))]).r);
+# 306 "src/sobelf_cuda.cu"
+__cuda_local_var_37012_13_non_const_p22 = (((sharedMem)[(((__cuda_local_var_36973_9_non_const_ty + 2) * __cuda_local_var_36980_9_non_const_sharedWidth) + (__cuda_local_var_36972_9_non_const_tx + 2))]).r);
+# 309 "src/sobelf_cuda.cu"
+__cuda_local_var_37015_15_non_const_Gx_r = ((((((float)((-__cuda_local_var_37005_13_non_const_p00) + __cuda_local_var_37007_13_non_const_p02)) - ((2.0F) * ((float)__cuda_local_var_37008_13_non_const_p10))) + ((2.0F) * ((float)__cuda_local_var_37009_13_non_const_p12))) - ((float)__cuda_local_var_37010_13_non_const_p20)) + ((float)__cuda_local_var_37012_13_non_const_p22));
+# 310 "src/sobelf_cuda.cu"
+__cuda_local_var_37016_15_non_const_Gy_r = (((((((float)(-__cuda_local_var_37005_13_non_const_p00)) - ((2.0F) * ((float)__cuda_local_var_37006_13_non_const_p01))) - ((float)__cuda_local_var_37007_13_non_const_p02)) + ((float)__cuda_local_var_37010_13_non_const_p20)) + ((2.0F) * ((float)__cuda_local_var_37011_13_non_const_p21))) + ((float)__cuda_local_var_37012_13_non_const_p22));
+# 312 "src/sobelf_cuda.cu"
+__cuda_local_var_37018_15_non_const_val_r = ( fdividef((sqrtf(((__cuda_local_var_37015_15_non_const_Gx_r * __cuda_local_var_37015_15_non_const_Gx_r) + (__cuda_local_var_37016_15_non_const_Gy_r * __cuda_local_var_37016_15_non_const_Gy_r)))) , (4.0F)));
+# 315 "src/sobelf_cuda.cu"
+if (__cuda_local_var_37018_15_non_const_val_r > (15.0F))
+# 315 "src/sobelf_cuda.cu"
+{
+# 316 "src/sobelf_cuda.cu"
+((d_out[__cuda_local_var_37002_13_non_const_idx]).r) = 255;
+# 317 "src/sobelf_cuda.cu"
+((d_out[__cuda_local_var_37002_13_non_const_idx]).g) = 255;
+# 318 "src/sobelf_cuda.cu"
+((d_out[__cuda_local_var_37002_13_non_const_idx]).b) = 255;
+# 319 "src/sobelf_cuda.cu"
+}
+# 319 "src/sobelf_cuda.cu"
+else 
+# 319 "src/sobelf_cuda.cu"
+{
+# 320 "src/sobelf_cuda.cu"
+((d_out[__cuda_local_var_37002_13_non_const_idx]).r) = 0;
+# 321 "src/sobelf_cuda.cu"
+((d_out[__cuda_local_var_37002_13_non_const_idx]).g) = 0;
+# 322 "src/sobelf_cuda.cu"
+((d_out[__cuda_local_var_37002_13_non_const_idx]).b) = 0;
+# 323 "src/sobelf_cuda.cu"
+}
+# 324 "src/sobelf_cuda.cu"
+} else  {
+# 324 "src/sobelf_cuda.cu"
+if ((__cuda_local_var_36976_9_non_const_x < width) && (__cuda_local_var_36977_9_non_const_y < height))
+# 324 "src/sobelf_cuda.cu"
+{
+# 326 "src/sobelf_cuda.cu"
+ int __cuda_local_var_37032_13_non_const_idx;
+# 326 "src/sobelf_cuda.cu"
+__cuda_local_var_37032_13_non_const_idx = ((__cuda_local_var_36977_9_non_const_y * width) + __cuda_local_var_36976_9_non_const_x);
+# 327 "src/sobelf_cuda.cu"
+(d_out[__cuda_local_var_37032_13_non_const_idx]) = (d_in[__cuda_local_var_37032_13_non_const_idx]);
+# 328 "src/sobelf_cuda.cu"
+} } 
+# 329 "src/sobelf_cuda.cu"
+}}
+__asm__(".align 2");
+# 431 "/usr/local/cuda/include/vector_types.h"
+___device__(static  __no_sc__) __inline__ void _ZN4dim3C1Ejjj( struct dim3 *const this, 
+# 431 "/usr/local/cuda/include/vector_types.h"
+unsigned vx, 
+# 431 "/usr/local/cuda/include/vector_types.h"
+unsigned vy, 
+# 431 "/usr/local/cuda/include/vector_types.h"
+unsigned vz){
+# 431 "/usr/local/cuda/include/vector_types.h"
+{
+# 431 "/usr/local/cuda/include/vector_types.h"
+(this->x) = vx;
+# 431 "/usr/local/cuda/include/vector_types.h"
+(this->y) = vy;
+# 431 "/usr/local/cuda/include/vector_types.h"
+(this->z) = vz; 
+# 431 "/usr/local/cuda/include/vector_types.h"
+}}
+__asm__(".align 2");
+___device__(static  __no_sc__) __inline__ void _ZN4dim3C2Ejjj( struct dim3 *const this,  unsigned __T10,  unsigned __T11,  unsigned __T12){ {  _ZN4dim3C1Ejjj(this, __T10, __T11, __T12);  }}
