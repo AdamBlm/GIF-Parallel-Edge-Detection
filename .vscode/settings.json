@@ -1,0 +1,12 @@
+{
+    "files.associations": {
+        "mpi_domain_filter.h": "c",
+        "hybrid_openmp_mpi_filter.h": "c",
+        "omp.h": "c",
+        "type_traits": "cpp",
+        "stdexcept": "cpp",
+        "stdio.h": "c",
+        "stdlib.h": "c",
+        "sequential_filter.h": "c"
+    }
+}
